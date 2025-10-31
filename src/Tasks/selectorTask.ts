@@ -103,6 +103,7 @@ const onDecomposeTask = (context: Context, childTask: CompoundTaskChild, taskInd
     plan.push(childTask);
   }
 
+  // TODO: Add support for slots
   const result: PlanResult = {
     plan,
     status: plan.length === 0 ? DecompositionStatus.Failed : DecompositionStatus.Succeeded,
