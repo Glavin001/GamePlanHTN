@@ -128,6 +128,7 @@ const decompose = (context: Context, startIndex: number, task: CompoundTask): Pl
       log.debug(`Selector.OnDecompose:Task index: ${index}: ${task.Children[index].Name}`);
     }
 
+    // When we plan, we need to improve upon the previous MTR
     if (context?.LastMTR.length > 0 && context.MethodTraversalRecord.length < context.LastMTR.length) {
       const currentDecompositionIndex = context.MethodTraversalRecord.length;
 
