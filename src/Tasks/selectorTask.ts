@@ -77,6 +77,7 @@ const onDecomposeCompoundTask = (context: Context, childTask: CompoundTask, task
 };
 
 const onDecomposeTask = (context: Context, childTask: CompoundTaskChild, taskIndex: number, plan: PrimitiveTask[]): PlanResult => {
+  // If the task we're evaluating is invalid, return the existing plan as the result
   if (!childTask.isValid(context)) {
     if (context.LogDecomposition) {
       log.debug(`Selector.OnDecomposeTask:Failed:Task ${childTask.Name}.isValid returned false!`);
