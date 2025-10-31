@@ -6,13 +6,13 @@ import * as TestUtil from "./utils";
 
 
 test("Context defaults to Executing", () => {
-  var ctx = TestUtil.getEmptyTestContext();
+  const ctx = TestUtil.getEmptyTestContext();
 
   assert.is(ctx.ContextState, ContextState.Executing);
 });
 
 test("Init Initializes Collections", () => {
-  var ctx = TestUtil.getEmptyTestContext();
+  const ctx = TestUtil.getEmptyTestContext();
 
   ctx.init();
 
@@ -28,7 +28,7 @@ test("Init Initializes Collections", () => {
 });
 
 test("hasState expected behavior", () => {
-  var ctx = TestUtil.getEmptyTestContext();
+  const ctx = TestUtil.getEmptyTestContext();
 
   ctx.init();
   ctx.setState("HasB", 1, true, EffectType.Permanent);
@@ -38,7 +38,7 @@ test("hasState expected behavior", () => {
 });
 
 test("setState Planning Context expected behavior", () => {
-  var ctx = TestUtil.getEmptyTestContext();
+  const ctx = TestUtil.getEmptyTestContext();
 
   ctx.init();
   ctx.ContextState = ContextState.Planning;
@@ -53,7 +53,7 @@ test("setState Planning Context expected behavior", () => {
 });
 
 test("setState executing Context expected behavior", () => {
-  var ctx = TestUtil.getEmptyTestContext();
+  const ctx = TestUtil.getEmptyTestContext();
 
   ctx.init();
   ctx.ContextState = ContextState.Executing;
@@ -66,7 +66,7 @@ test("setState executing Context expected behavior", () => {
 
 
 test("GetState planning context expected behavior", () => {
-  var ctx = TestUtil.getEmptyTestContext();
+  const ctx = TestUtil.getEmptyTestContext();
 
   ctx.init();
   ctx.ContextState = ContextState.Planning;
@@ -77,7 +77,7 @@ test("GetState planning context expected behavior", () => {
 });
 
 test("GetState executing context expected behavior", () => {
-  var ctx = TestUtil.getEmptyTestContext();
+  const ctx = TestUtil.getEmptyTestContext();
 
   ctx.init();
   ctx.ContextState = ContextState.Executing;
@@ -89,7 +89,7 @@ test("GetState executing context expected behavior", () => {
 
 
 test("GetWorldStateChangeDepth expected behavior", () => {
-  var ctx = TestUtil.getEmptyTestContext();
+  const ctx = TestUtil.getEmptyTestContext();
 
   ctx.init();
   ctx.ContextState = ContextState.Executing;
@@ -110,7 +110,7 @@ test("GetWorldStateChangeDepth expected behavior", () => {
 });
 
 test("Trim for execution expected behavior", () => {
-  var ctx = TestUtil.getEmptyTestContext();
+  const ctx = TestUtil.getEmptyTestContext();
 
   ctx.init();
   ctx.ContextState = ContextState.Planning;
@@ -125,7 +125,7 @@ test("Trim for execution expected behavior", () => {
 });
 
 test("Trim for execution throws exception on wrong context state", () => {
-  var ctx = TestUtil.getEmptyTestContext();
+  const ctx = TestUtil.getEmptyTestContext();
 
   ctx.init();
   ctx.ContextState = ContextState.Executing;
@@ -135,7 +135,7 @@ test("Trim for execution throws exception on wrong context state", () => {
 });
 
 test("Trim to stack depth expected behavior", () => {
-  var ctx = TestUtil.getEmptyTestContext();
+  const ctx = TestUtil.getEmptyTestContext();
 
   ctx.init();
   ctx.ContextState = ContextState.Planning;
@@ -155,7 +155,7 @@ test("Trim to stack depth expected behavior", () => {
 });
 
 test("Trim to stack depth throws exception on wrong context state", () => {
-  var ctx = TestUtil.getEmptyTestContext();
+  const ctx = TestUtil.getEmptyTestContext();
 
   ctx.init();
   ctx.ContextState = ContextState.Executing;

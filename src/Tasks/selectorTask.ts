@@ -2,7 +2,6 @@ import log from "loglevel";
 import type Context from "../context";
 import DecompositionStatus from "../decompositionStatus";
 import type { PlanResult } from "../types";
-import type { PrimitiveTaskConfig, PrimitiveTaskProps } from "./primitiveTask";
 import CompoundTask, { type CompoundTaskChild } from "./compoundTask";
 import PrimitiveTask from "./primitiveTask";
 

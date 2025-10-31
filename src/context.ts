@@ -152,7 +152,11 @@ class Context {
     for (const worldStateKey of Object.keys(this.WorldStateChangeStack)) {
       const stack = this.WorldStateChangeStack[worldStateKey];
 
-      while (stack && stack.length !== 0 && stack[0].effectType !== EffectType.Permanent) {
+      if (!stack) {
+        continue;
+      }
+
+      while (stack.length !== 0 && stack[0].effectType !== EffectType.Permanent) {
         stack.shift();
       }
     }
@@ -170,7 +174,11 @@ class Context {
     for (const stackDepthKey of Object.keys(stackDepth)) {
       const stack = this.WorldStateChangeStack[stackDepthKey];
 
-      while (stack && stack.length > stackDepth[stackDepthKey]) {
+      if (!stack) {
+        continue;
+      }
+
+      while (stack.length > stackDepth[stackDepthKey]) {
         stack.pop();
       }
     }

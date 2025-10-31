@@ -1,4 +1,3 @@
-/* eslint-disable max-statements -- Some long tests are long */
 
 import { test } from "uvu";
 import * as assert from "uvu/assert";

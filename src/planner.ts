@@ -129,7 +129,7 @@ class Planner {
     this.currentTaskExecutingConditionFailedCallback = callback;
   }
 
-  // eslint-disable-next-line max-statements, complexity -- This closely follows FluidHTN implementation
+  // eslint-disable-next-line complexity -- This closely follows FluidHTN implementation
   tick(domain: Domain, ctx: Context, allowImmediateReplan = true): void {
     if (!ctx.IsInitialized) {
       throw new Error("Context was not initialized!");

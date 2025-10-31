@@ -65,7 +65,7 @@ class Domain {
     childTask.Parent = parentTask;
   }
 
-  // eslint-disable-next-line max-statements, complexity -- Mirrors FluidHTN structure
+  // eslint-disable-next-line complexity -- Mirrors FluidHTN structure
   findPlan(context: Context): DomainPlanResult {
     if (!(context instanceof Context)) {
       throw new TypeError(`Domain received non-context object: ${JSON.stringify(context)}`);

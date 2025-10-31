@@ -2,7 +2,6 @@ import Context from "../src/context";
 import Domain from "../src/domain";
 import CompoundTask from "../src/Tasks/compoundTask";
 import PrimitiveTask from "../src/Tasks/primitiveTask";
-import log from "loglevel";
 import Effect from "../src/effect";
 
 function getEmptyTestContext() {

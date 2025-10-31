@@ -1,4 +1,3 @@
-/* eslint-disable max-statements -- Some tests are long. That's how tests be sometimes. */
 import { test } from "uvu";
 import * as assert from "uvu/assert";
 import ContextState from "../src/contextState";
