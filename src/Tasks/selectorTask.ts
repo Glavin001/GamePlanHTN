@@ -130,6 +130,8 @@ const decompose = (context: Context, startIndex: number, task: CompoundTask): Pl
 
     // When we plan, we need to improve upon the previous MTR
     if (context?.LastMTR.length > 0 && context.MethodTraversalRecord.length < context.LastMTR.length) {
+      // If our current plan is shorter than our previous plan, check to make sure it's an actual
+      // improvement. (Longer plans are not an improvement)
       const currentDecompositionIndex = context.MethodTraversalRecord.length;
 
       if (!beatsLastMTR(context, index, currentDecompositionIndex)) {
