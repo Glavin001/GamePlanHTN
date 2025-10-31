@@ -157,7 +157,10 @@ const decompose = (context: Context, startIndex: number, task: CompoundTask): Pl
 
     const childTask = task.Children[index];
 
+    // Note: result and plan will be mutated by this function
     result = onDecomposeTask(context, childTask, index, result.plan);
+
+    // If we cannot make a plan OR if we completed a plan, short circuit this for loop
 
     if (result.status === DecompositionStatus.Rejected ||
       result.status === DecompositionStatus.Succeeded ||
