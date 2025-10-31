@@ -1,7 +1,3 @@
-// Portions of this file are derived from FluidHTN (MIT License)
-// Copyright (c) 2019 Pål Trefall
-// https://github.com/ptrefall/fluid-hierarchical-task-network
-
 import type Context from "../context";
 import DecompositionStatus from "../decompositionStatus";
 import type { PlanResult } from "../types";

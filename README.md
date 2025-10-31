@@ -2,6 +2,8 @@
 
 A simple but powerful HTN planner in Javascript based on the excellent work of [FluidHTN](https://github.com/ptrefall/fluid-hierarchical-task-network). There are several changes to the library to make it more idiomatic JS rather than C# (these are detailed below.)
 
+> Portions of this project are derived from FluidHTN (MIT License) by Pål Trefall.
+
 ![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Build](https://github.com/TotallyGatsby/GamePlanHTN/actions/workflows/ci.yml/badge.svg)
 

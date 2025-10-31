@@ -1,7 +1,3 @@
-// Portions of this file are derived from FluidHTN (MIT License)
-// Copyright (c) 2019 Pål Trefall
-// https://github.com/ptrefall/fluid-hierarchical-task-network
-
 import Context from "../src/context";
 import Domain from "../src/domain";
 import CompoundTask from "../src/Tasks/compoundTask";
