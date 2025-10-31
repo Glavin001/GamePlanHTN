@@ -99,4 +99,16 @@ test("Effect with incorrect type for action doesn't crash", () => {
   assert.not(testContext.Done);
 });
 
+test("Effect apply throws when context is invalid", () => {
+  const testEffect = new Effect({
+    name: "Invalid",
+    type: EffectType.PlanOnly,
+    action: () => undefined,
+  });
+
+  assert.throws(() => {
+    testEffect.apply(null);
+  });
+});
+
 test.run();

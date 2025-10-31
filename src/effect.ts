@@ -2,7 +2,7 @@
 // Copyright (c) 2019 Pål Trefall
 // https://github.com/ptrefall/fluid-hierarchical-task-network
 
-import type Context from "./context";
+import Context from "./context";
 import type { EffectTypeValue } from "./effectType";
 
 export type EffectAction = (context: Context, type: EffectTypeValue | null) => void;
@@ -34,7 +34,11 @@ class Effect {
     }
   }
 
-  apply(context: Context): void {
+  apply(context?: Context | null): void {
+    if (!(context instanceof Context)) {
+      throw new TypeError("Unexpected context type!");
+    }
+
     if (typeof this._effectFunction === "function") {
       this._effectFunction(context, this.Type);
     }

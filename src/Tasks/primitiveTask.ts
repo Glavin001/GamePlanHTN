@@ -3,30 +3,42 @@
 // https://github.com/ptrefall/fluid-hierarchical-task-network
 
 import log from "loglevel";
-import type Context from "../context";
+import Context from "../context";
 import Effect, { EffectDefinition } from "../effect";
 import type { TaskStatusValue } from "../taskStatus";
 import type CompoundTask from "./compoundTask";
+import FuncCondition, { type ConditionPredicate } from "../conditions/funcCondition";
+import FuncOperator from "../operators/funcOperator";
 
 export type TaskCondition = (context: Context) => boolean;
+export type ConditionLike = TaskCondition | FuncCondition;
 
 export interface ExecutingCondition {
   Name: string;
   func: TaskCondition;
 }
 
-export type PrimitiveTaskOperator = (context: Context) => TaskStatusValue;
+export type PrimitiveTaskOperatorFunction = (context: Context) => TaskStatusValue;
+export type PrimitiveTaskOperator = PrimitiveTaskOperatorFunction | FuncOperator;
 
 export interface PrimitiveTaskConfig {
   name: string;
   operator?: PrimitiveTaskOperator;
-  conditions?: TaskCondition[];
+  conditions?: ConditionLike[];
   effects?: EffectDefinition[];
   stop?: (context: Context) => void;
   abort?: (context: Context) => void;
 }
 
 export type PrimitiveTaskProps = PrimitiveTaskConfig | PrimitiveTaskOperator;
+
+const unwrapCondition = (condition: ConditionLike): TaskCondition => {
+  if (condition instanceof FuncCondition) {
+    return (context: Context) => condition.isValid(context);
+  }
+
+  return condition as ConditionPredicate;
+};
 
 class PrimitiveTask {
   public Name = "";
@@ -39,23 +51,29 @@ class PrimitiveTask {
 
   public Parent?: CompoundTask;
 
-  public operator?: PrimitiveTaskOperator;
+  public operator?: PrimitiveTaskOperatorFunction;
+
+  private operatorSource?: PrimitiveTaskOperator;
 
   private stopAction?: (context: Context) => void;
 
   private abortAction?: (context: Context) => void;
 
   constructor(props: PrimitiveTaskProps) {
-    if (typeof props === "function") {
-      this.operator = props;
+    if (props instanceof FuncOperator || typeof props === "function") {
+      this.setOperator(props);
     } else {
       this.Name = props.name;
-      this.operator = props.operator;
-      this.stopAction = props.stop;
-      this.abortAction = props.abort;
+
+      if (typeof props.operator !== "undefined") {
+        this.setOperator(props.operator, props.stop, props.abort);
+      } else {
+        this.stopAction = props.stop;
+        this.abortAction = props.abort;
+      }
 
       if (Array.isArray(props.conditions)) {
-        this.Conditions = props.conditions;
+        this.Conditions = props.conditions.map((condition) => unwrapCondition(condition));
       }
 
       if (Array.isArray(props.effects)) {
@@ -106,14 +124,21 @@ class PrimitiveTask {
     });
   }
 
-  addCondition(condition: TaskCondition): this {
-    this.Conditions.push(condition);
+  addCondition(condition: ConditionLike): this {
+    this.Conditions.push(unwrapCondition(condition));
 
     return this;
   }
 
-  addExecutingCondition(condition: ExecutingCondition): this {
-    this.ExecutingConditions.push(condition);
+  addExecutingCondition(condition: ExecutingCondition | FuncCondition): this {
+    if (condition instanceof FuncCondition) {
+      this.ExecutingConditions.push({
+        Name: condition.Name,
+        func: (context: Context) => condition.isValid(context),
+      });
+    } else {
+      this.ExecutingConditions.push(condition);
+    }
 
     return this;
   }
@@ -128,14 +153,22 @@ class PrimitiveTask {
     return this;
   }
 
-  stop(context?: Context): void {
-    if (this.stopAction && context) {
+  stop(context?: Context | null): void {
+    if (!(context instanceof Context)) {
+      throw new TypeError("Unexpected context type!");
+    }
+
+    if (this.stopAction) {
       this.stopAction(context);
     }
   }
 
-  abort(context?: Context): void {
-    if (this.abortAction && context) {
+  abort(context?: Context | null): void {
+    if (!(context instanceof Context)) {
+      throw new TypeError("Unexpected context type!");
+    }
+
+    if (this.abortAction) {
       this.abortAction(context);
     }
   }
@@ -145,9 +178,33 @@ class PrimitiveTask {
     forceStop?: (context: Context) => void,
     abort?: (context: Context) => void,
   ): this {
-    this.operator = operator;
-    this.stopAction = forceStop;
-    this.abortAction = abort;
+    if (operator instanceof FuncOperator) {
+      return this.setOperator(
+        (context: Context) => operator.update(context),
+        (context: Context) => operator.stop(context),
+        (context: Context) => operator.abort(context),
+      );
+    }
+
+    if (this.operatorSource && operator && this.operatorSource !== operator) {
+      throw new Error("A Primitive Task can only contain a single operator!");
+    }
+
+    if (operator) {
+      this.operator = operator;
+      this.operatorSource = operator;
+    } else if (!this.operator) {
+      this.operator = undefined;
+      this.operatorSource = undefined;
+    }
+
+    if (typeof forceStop !== "undefined") {
+      this.stopAction = forceStop;
+    }
+
+    if (typeof abort !== "undefined") {
+      this.abortAction = abort;
+    }
 
     return this;
   }

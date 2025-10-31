@@ -18,6 +18,8 @@ function getEmptyTestContext() {
     HasC: 0,
   };
 
+  context.Done = false;
+
   return context;
 }
 
@@ -56,9 +58,6 @@ function getSimplePrimitiveTask(name) {
     name,
     conditions: [],
     effects: [],
-    operator: () => {
-      log.info("test");
-    },
   });
 }
 

@@ -11,6 +11,7 @@ import Slot from "./Tasks/slot";
 import DecompositionStatus from "./decompositionStatus";
 import { ContextState } from "./contextState";
 import type { PlanResult } from "./types";
+import FuncOperator from "./operators/funcOperator";
 
 export type DomainTaskDefinition =
   | CompoundTask
@@ -230,7 +231,7 @@ class Domain {
       return task;
     }
 
-    if (typeof task === "function" || (typeof task === "object" && "operator" in task)) {
+    if (typeof task === "function" || task instanceof FuncOperator || (typeof task === "object" && task !== null && "operator" in task)) {
       return new PrimitiveTask(task as PrimitiveTaskProps);
     }
 

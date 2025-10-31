@@ -13,6 +13,7 @@ import * as TestUtil from "./utils";
 import ContextState from "../src/contextState";
 import EffectType from "../src/effectType";
 import PausePlanTask from "../src/Tasks/pausePlanTask";
+import FuncCondition from "../src/conditions/funcCondition";
 
 log.enableAll();
 
@@ -358,10 +359,11 @@ test("findPlan if MTRs are equal then return empty plan", () => {
 
   ctx.init();
   ctx.LastMTR.push(1);
+  ctx.LastMTR.push(0);
 
-  // Root is a Selector that branch off into task1 selector or task2 sequence.
-  // MTR only tracks decomposition of compound tasks, so our MTR is only 1 layer deep here,
-  // Since both compound tasks decompose into primitive tasks.
+  // Root is a Selector that branches into task1 sequence or task2 selector.
+  // With selectors tracking both compound nodes and the winning primitive child,
+  // the recorded MTR has two entries when a plan is found.
   const domain = TestUtil.getEmptyTestDomain();
   const task1 = TestUtil.getEmptySequenceTask("Test1");
   const task2 = TestUtil.getEmptySelectorTask("Test2");
@@ -378,8 +380,49 @@ test("findPlan if MTRs are equal then return empty plan", () => {
 
   assert.equal(status, DecompositionStatus.Rejected);
   assert.equal(plan.length, 0);
-  assert.equal(ctx.MethodTraversalRecord.length, 1);
+  assert.equal(ctx.MethodTraversalRecord.length, 2);
   assert.equal(ctx.MethodTraversalRecord[0], ctx.LastMTR[0]);
+  assert.equal(ctx.MethodTraversalRecord[1], ctx.LastMTR[1]);
+});
+
+test("findPlan selects better primary task when MTR improves", () => {
+  const ctx = TestUtil.getEmptyTestContext();
+
+  ctx.init();
+  ctx.LastMTR.push(0);
+  ctx.LastMTR.push(1);
+
+  const domain = TestUtil.getEmptyTestDomain();
+  const selector = TestUtil.getEmptySelectorTask("Select");
+  const actionA = TestUtil.getSimplePrimitiveTask("Action A")
+    .addCondition(new FuncCondition("Can choose A", (context) => context.Done === true));
+  const actionB = TestUtil.getSimplePrimitiveTask("Action B")
+    .addCondition(new FuncCondition("Can choose B", (context) => context.Done === false));
+
+  domain.add(domain.Root, selector);
+  domain.add(selector, actionA);
+  domain.add(selector, actionB);
+
+  let { status, plan } = domain.findPlan(ctx);
+
+  assert.equal(status, DecompositionStatus.Rejected);
+  assert.is(plan.length, 0);
+  assert.is(ctx.MethodTraversalRecord.length, 2);
+  assert.is(ctx.MethodTraversalRecord[0], ctx.LastMTR[0]);
+  assert.is(ctx.MethodTraversalRecord[1], ctx.LastMTR[1]);
+
+  ctx.Done = true;
+  ctx.IsDirty = true;
+
+  ({ status, plan } = domain.findPlan(ctx));
+
+  assert.equal(status, DecompositionStatus.Succeeded);
+  assert.ok(plan);
+  assert.is(plan.length, 1);
+  assert.is(plan[0].Name, "Action A");
+  assert.is(ctx.MethodTraversalRecord.length, 2);
+  assert.is(ctx.MethodTraversalRecord[0], ctx.LastMTR[0]);
+  assert.ok(ctx.MethodTraversalRecord[1] < ctx.LastMTR[1]);
 });
 
 

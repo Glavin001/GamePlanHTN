@@ -267,8 +267,9 @@ test("Decompose Nested Compound Subtask equal to MTR expected behavior", () => {
   assert.equal(status, DecompositionStatus.Succeeded);
   assert.ok(plan);
   assert.equal(plan.length, 2);
-  assert.equal(ctx.MethodTraversalRecord.length, 1);
+  assert.equal(ctx.MethodTraversalRecord.length, 2);
   assert.equal(ctx.MethodTraversalRecord[0], 1);
+  assert.equal(ctx.MethodTraversalRecord[1], 1);
   assert.equal("Sub-task3", plan.shift().Name);
   assert.equal("Sub-task4", plan.shift().Name);
 });

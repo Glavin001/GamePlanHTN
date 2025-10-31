@@ -98,6 +98,7 @@ const onDecomposeTask = (context: Context, childTask: CompoundTaskChild, taskInd
   }
 
   if (childTask instanceof PrimitiveTask) {
+    context.MethodTraversalRecord.push(taskIndex);
     if (context.LogDecomposition) {
       log.debug(`Selector.OnDecomposeTask:Pushed ${childTask.Name} to plan!`);
     }

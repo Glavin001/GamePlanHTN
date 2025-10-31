@@ -139,7 +139,8 @@ test("Decompose MTR Succeeds when equal expected behavior", () => {
 
   assert.equal(status, DecompositionStatus.Succeeded);
   assert.ok(plan);
-  assert.equal(ctx.MethodTraversalRecord.length, 0);
+  assert.equal(ctx.MethodTraversalRecord.length, 1);
+  assert.equal(ctx.MethodTraversalRecord[0], ctx.LastMTR[0]);
   assert.equal(plan.length, 1);
 });
 
@@ -161,8 +162,9 @@ test("Decompose Compound Subtasks Succeeds expected behavior", () => {
   assert.ok(plan);
   assert.equal(plan.length, 1);
   assert.equal("Sub-task2", plan[0].Name);
-  assert.equal(ctx.MethodTraversalRecord.length, 1);
+  assert.equal(ctx.MethodTraversalRecord.length, 2);
   assert.equal(ctx.MethodTraversalRecord[0], 0);
+  assert.equal(ctx.MethodTraversalRecord[1], 1);
 });
 
 test("Decompose Compound Subtasks fails expected behavior", () => {
@@ -182,7 +184,8 @@ test("Decompose Compound Subtasks fails expected behavior", () => {
   assert.ok(plan);
   assert.equal(plan.length, 1);
   assert.equal("Sub-task3", plan[0].Name);
-  assert.equal(ctx.MethodTraversalRecord.length, 0);
+  assert.equal(ctx.MethodTraversalRecord.length, 1);
+  assert.equal(ctx.MethodTraversalRecord[0], 1);
 });
 
 
@@ -208,7 +211,8 @@ test("Decompose Nested Compound Subtasks fails expected behavior", () => {
   assert.ok(plan);
   assert.equal(plan.length, 1);
   assert.equal("Sub-task4", plan[0].Name);
-  assert.equal(ctx.MethodTraversalRecord.length, 0);
+  assert.equal(ctx.MethodTraversalRecord.length, 1);
+  assert.equal(ctx.MethodTraversalRecord[0], 1);
 });
 
 
@@ -230,8 +234,9 @@ test("Decompose Compound Subtasks beats last mtr expected behavior", () => {
   assert.ok(plan);
   assert.equal(plan.length, 1);
   assert.equal(plan[0].Name, "Sub-task2");
-  assert.equal(ctx.MethodTraversalRecord.length, 1);
+  assert.equal(ctx.MethodTraversalRecord.length, 2);
   assert.equal(ctx.MethodTraversalRecord[0], 0);
+  assert.equal(ctx.MethodTraversalRecord[1], 1);
 });
 
 
@@ -253,8 +258,9 @@ test("Decompose Compound Subtasks equal to last mtr expected behavior", () => {
   assert.ok(plan);
   assert.equal(plan.length, 1);
   assert.equal(plan[0].Name, "Sub-task2");
-  assert.equal(ctx.MethodTraversalRecord.length, 1);
+  assert.equal(ctx.MethodTraversalRecord.length, 2);
   assert.equal(ctx.MethodTraversalRecord[0], 0);
+  assert.equal(ctx.MethodTraversalRecord[1], 1);
 });
 
 

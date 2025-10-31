@@ -7,6 +7,7 @@ import * as assert from "uvu/assert";
 import ContextState from "../src/contextState";
 import Effect from "../src/effect";
 import EffectType from "../src/effectType";
+import DomainBuilder from "../src/domainBuilder";
 import Planner from "../src/planner";
 import PrimitiveTask from "../src/Tasks/primitiveTask";
 import TaskStatus from "../src/taskStatus";
@@ -126,7 +127,7 @@ test("Tick with operator with null function expected behavior ", () => {
 
   const domain = TestUtil.getEmptyTestDomain();
   const task1 = TestUtil.getEmptySelectorTask("Test");
-  const task2 = TestUtil.getSimplePrimitiveTask("Sub-task");
+  const task2 = new PrimitiveTask({ name: "Sub-task" });
 
   task2.setOperator(undefined);
   domain.add(domain.Root, task1);
@@ -550,6 +551,294 @@ test("On Current Task Executing Condition Failed expected behavior ", () => {
   planner.tick(domain, ctx);
 
   assert.ok(result);
+});
+
+test("Planner replans when condition change invalidates current task", () => {
+  const ctx = TestUtil.getEmptyTestContext();
+
+  ctx.init();
+  const planner = new Planner();
+  const domain = TestUtil.getEmptyTestDomain();
+  const select = TestUtil.getEmptySelectorTask("Test Select");
+
+  const actionA = new PrimitiveTask({ name: "Test Action A" });
+  actionA.addCondition((context) => context.Done === true);
+  actionA.addExecutingCondition({ Name: "Can choose A", func: (context) => context.Done === true });
+  actionA.setOperator(() => TaskStatus.Continue);
+
+  const actionB = new PrimitiveTask({ name: "Test Action B" });
+  actionB.addCondition((context) => context.Done === false);
+  actionB.addExecutingCondition({ Name: "Can not choose A", func: (context) => context.Done === false });
+  actionB.setOperator(() => TaskStatus.Continue);
+
+  domain.add(domain.Root, select);
+  domain.add(select, actionA);
+  domain.add(select, actionB);
+
+  planner.tick(domain, ctx, false);
+
+  let plan = planner.getPlan();
+  let currentTask = planner.getCurrentTask();
+  assert.is(plan.length, 0);
+  assert.is(currentTask?.Name, "Test Action B");
+  assert.is(ctx.MethodTraversalRecord.length, 2);
+  assert.is(ctx.MethodTraversalRecord[0], 0);
+  assert.is(ctx.MethodTraversalRecord[1], 1);
+
+  ctx.Done = true;
+  ctx.IsDirty = true;
+
+  planner.tick(domain, ctx, true);
+
+  plan = planner.getPlan();
+  currentTask = planner.getCurrentTask();
+  assert.is(plan.length, 0);
+  assert.is(currentTask?.Name, "Test Action A");
+  assert.is(ctx.MethodTraversalRecord.length, 2);
+  assert.is(ctx.MethodTraversalRecord[0], 0);
+  assert.is(ctx.MethodTraversalRecord[1], 0);
+});
+
+test("Planner replans when world state change produces better plan", () => {
+  const ctx = TestUtil.getEmptyTestContext();
+
+  ctx.init();
+  const planner = new Planner();
+  const domain = TestUtil.getEmptyTestDomain();
+  const select = TestUtil.getEmptySelectorTask("Test Select");
+
+  const actionA = new PrimitiveTask({ name: "Test Action A" });
+  actionA.addCondition((context) => context.getState("HasA") === 1);
+  actionA.setOperator(() => TaskStatus.Continue);
+
+  const actionB = new PrimitiveTask({ name: "Test Action B" });
+  actionB.addCondition((context) => context.getState("HasA") === 0);
+  actionB.setOperator(() => TaskStatus.Continue);
+
+  domain.add(domain.Root, select);
+  domain.add(select, actionA);
+  domain.add(select, actionB);
+
+  planner.tick(domain, ctx, false);
+
+  let plan = planner.getPlan();
+  let currentTask = planner.getCurrentTask();
+  assert.is(plan.length, 0);
+  assert.is(currentTask?.Name, "Test Action B");
+  assert.is(ctx.MethodTraversalRecord.length, 2);
+  assert.is(ctx.MethodTraversalRecord[0], 0);
+  assert.is(ctx.MethodTraversalRecord[1], 1);
+
+  ctx.setState("HasA", 1, true, EffectType.Permanent);
+
+  planner.tick(domain, ctx, true);
+
+  plan = planner.getPlan();
+  currentTask = planner.getCurrentTask();
+  assert.is(plan.length, 0);
+  assert.is(currentTask?.Name, "Test Action A");
+  assert.is(ctx.MethodTraversalRecord.length, 2);
+  assert.is(ctx.MethodTraversalRecord[0], 0);
+  assert.is(ctx.MethodTraversalRecord[1], 0);
+});
+
+test("Planner replans when executing condition becomes invalid", () => {
+  const ctx = TestUtil.getEmptyTestContext();
+
+  ctx.init();
+  const planner = new Planner();
+  const domain = TestUtil.getEmptyTestDomain();
+  const select = TestUtil.getEmptySelectorTask("Test Select");
+
+  const actionA = new PrimitiveTask({ name: "Test Action A" });
+  actionA.addCondition((context) => context.getState("HasA") === 0);
+  actionA.addExecutingCondition({ Name: "Can choose A", func: (context) => context.getState("HasA") === 0 });
+  actionA.setOperator(() => TaskStatus.Continue);
+
+  const actionB = new PrimitiveTask({ name: "Test Action B" });
+  actionB.addCondition((context) => context.getState("HasA") === 1);
+  actionB.addExecutingCondition({ Name: "Can not choose A", func: (context) => context.getState("HasA") === 1 });
+  actionB.setOperator(() => TaskStatus.Continue);
+
+  domain.add(domain.Root, select);
+  domain.add(select, actionA);
+  domain.add(select, actionB);
+
+  planner.tick(domain, ctx, false);
+
+  let plan = planner.getPlan();
+  let currentTask = planner.getCurrentTask();
+  assert.is(plan.length, 0);
+  assert.is(currentTask?.Name, "Test Action A");
+  assert.is(ctx.MethodTraversalRecord.length, 2);
+  assert.is(ctx.MethodTraversalRecord[0], 0);
+  assert.is(ctx.MethodTraversalRecord[1], 0);
+
+  ctx.setState("HasA", 1, true, EffectType.Permanent);
+
+  planner.tick(domain, ctx, true);
+
+  plan = planner.getPlan();
+  currentTask = planner.getCurrentTask();
+  assert.is(plan.length, 0);
+  assert.is(currentTask?.Name, "Test Action B");
+  assert.is(ctx.MethodTraversalRecord.length, 2);
+  assert.is(ctx.MethodTraversalRecord[0], 0);
+  assert.is(ctx.MethodTraversalRecord[1], 1);
+});
+
+test("Planner toggles plans when executing conditions track world state", () => {
+  const ctx = TestUtil.getEmptyTestContext();
+
+  ctx.init();
+  const planner = new Planner();
+  const domain = new DomainBuilder("Test")
+    .action("A")
+    .condition("Is True", (context) => context.hasState("HasA"))
+    .executingCondition("Is True", (context) => context.hasState("HasA"))
+    .do((context) => {
+      context.Done = true;
+      return TaskStatus.Continue;
+    })
+    .end()
+    .action("B")
+    .condition("Is False", (context) => context.hasState("HasA") === false)
+    .executingCondition("Is False", (context) => context.hasState("HasA") === false)
+    .do((context) => {
+      context.Done = false;
+      return TaskStatus.Continue;
+    })
+    .end()
+    .build();
+
+  ctx.setState("HasA", 1, true, EffectType.Permanent);
+  planner.tick(domain, ctx);
+  assert.is(ctx.Done, true);
+
+  ctx.setState("HasA", 0, true, EffectType.Permanent);
+  planner.tick(domain, ctx);
+  assert.is(ctx.Done, false);
+
+  ctx.setState("HasA", 1, true, EffectType.Permanent);
+  planner.tick(domain, ctx);
+  assert.is(ctx.Done, true);
+});
+
+test("Planner keeps current plan without executing conditions", () => {
+  const ctx = TestUtil.getEmptyTestContext();
+
+  ctx.init();
+  const planner = new Planner();
+  const domain = new DomainBuilder("Test")
+    .action("A")
+    .condition("Is True", (context) => context.hasState("HasA"))
+    .do((context) => {
+      context.Done = true;
+      return TaskStatus.Continue;
+    })
+    .end()
+    .action("B")
+    .condition("Is False", (context) => context.hasState("HasA") === false)
+    .do((context) => {
+      context.Done = false;
+      return TaskStatus.Continue;
+    })
+    .end()
+    .build();
+
+  ctx.setState("HasA", 1, true, EffectType.Permanent);
+  planner.tick(domain, ctx);
+  assert.is(ctx.Done, true);
+
+  ctx.setState("HasA", 0, true, EffectType.Permanent);
+  planner.tick(domain, ctx);
+  assert.is(ctx.Done, true);
+});
+
+test("Planner can toggle plans when operator succeeds on invalid condition", () => {
+  const ctx = TestUtil.getEmptyTestContext();
+
+  ctx.init();
+  const planner = new Planner();
+  const domain = new DomainBuilder("Test")
+    .action("A")
+    .condition("Is True", (context) => context.hasState("HasA"))
+    .do((context) => {
+      if (context.hasState("HasA") === false) {
+        return TaskStatus.Success;
+      }
+
+      context.Done = true;
+      return TaskStatus.Continue;
+    })
+    .end()
+    .action("B")
+    .condition("Is False", (context) => context.hasState("HasA") === false)
+    .do((context) => {
+      if (context.hasState("HasA")) {
+        return TaskStatus.Success;
+      }
+
+      context.Done = false;
+      return TaskStatus.Continue;
+    })
+    .end()
+    .build();
+
+  ctx.setState("HasA", 1, true, EffectType.Permanent);
+  planner.tick(domain, ctx);
+  assert.is(ctx.Done, true);
+
+  ctx.setState("HasA", 0, true, EffectType.Permanent);
+  planner.tick(domain, ctx);
+  assert.is(ctx.Done, false);
+
+  ctx.setState("HasA", 1, true, EffectType.Permanent);
+  planner.tick(domain, ctx);
+  assert.is(ctx.Done, true);
+});
+
+test("Planner fails to toggle when operator returns failure on invalid condition", () => {
+  const ctx = TestUtil.getEmptyTestContext();
+
+  ctx.init();
+  const planner = new Planner();
+  const domain = new DomainBuilder("Test")
+    .action("A")
+    .condition("Is True", (context) => context.hasState("HasA"))
+    .do((context) => {
+      if (context.hasState("HasA") === false) {
+        return TaskStatus.Failure;
+      }
+
+      context.Done = true;
+      return TaskStatus.Continue;
+    })
+    .end()
+    .action("B")
+    .condition("Is False", (context) => context.hasState("HasA") === false)
+    .do((context) => {
+      if (context.hasState("HasA")) {
+        return TaskStatus.Failure;
+      }
+
+      context.Done = false;
+      return TaskStatus.Continue;
+    })
+    .end()
+    .build();
+
+  ctx.setState("HasA", 1, true, EffectType.Permanent);
+  planner.tick(domain, ctx);
+  assert.is(ctx.Done, true);
+
+  ctx.setState("HasA", 0, true, EffectType.Permanent);
+  planner.tick(domain, ctx);
+  assert.is(ctx.Done, false);
+
+  ctx.setState("HasA", 1, true, EffectType.Permanent);
+  planner.tick(domain, ctx);
+  assert.is(ctx.Done, true);
 });
 
 test.run();

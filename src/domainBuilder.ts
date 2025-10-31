@@ -24,6 +24,10 @@ class DomainBuilder<TContext extends Context = Context> {
   }
 
   get pointer(): Pointer {
+    if (this.pointers.length === 0) {
+      throw new Error("The domain has already been built and the builder can no longer be used.");
+    }
+
     return this.pointers[this.pointers.length - 1];
   }
 
@@ -31,6 +35,8 @@ class DomainBuilder<TContext extends Context = Context> {
     if (this.pointer !== this.domain.Root) {
       throw new Error(`The domain definition lacks one or more end() calls. Pointer is '${this.pointer.Name}', expected '${this.domain.Root.Name}'.`);
     }
+
+    this.pointers = [];
 
     return this.domain;
   }

@@ -17,7 +17,14 @@ test("Build returns domain with root", () => {
 
   assert.instance(domain, Domain);
   assert.ok(domain.Root instanceof CompoundTask);
-  assert.is(builder.pointer, domain.Root);
+  assert.throws(() => builder.pointer);
+});
+
+test("Build throws if pointer not restored", () => {
+  const builder = createBuilder();
+  builder.select("select test");
+
+  assert.throws(() => builder.build());
 });
 
 test("Select pushes pointer and end restores", () => {
@@ -78,6 +85,14 @@ test("Executing condition requires primitive task", () => {
   assert.is(primitive.ExecutingConditions.length, 1);
 });
 
+test("Do requires primitive pointer", () => {
+  const builder = createBuilder();
+  assert.throws(() => builder.do(() => TaskStatus.Success));
+
+  builder.action("primitive").do(() => TaskStatus.Success);
+  assert.type((builder.pointer as PrimitiveTask).operator, "function");
+});
+
 test("Do assigns operator with optional handlers", () => {
   const builder = createBuilder();
   let stopped = false;
@@ -93,8 +108,10 @@ test("Do assigns operator with optional handlers", () => {
   );
   const primitive = builder.pointer as PrimitiveTask;
   assert.type(primitive.operator, "function");
-  primitive.stop({} as Context);
-  primitive.abort({} as Context);
+  const context = new Context();
+  context.init();
+  primitive.stop(context);
+  primitive.abort(context);
   assert.ok(stopped);
   assert.ok(aborted);
 });
@@ -104,6 +121,11 @@ test("Effect attaches to primitive", () => {
   builder.action("primitive").effect("effect", EffectType.PlanOnly, () => undefined);
   const primitive = builder.pointer as PrimitiveTask;
   assert.is(primitive.Effects.length, 1);
+});
+
+test("Effect requires primitive pointer", () => {
+  const builder = createBuilder();
+  assert.throws(() => builder.effect("effect", EffectType.PlanOnly, () => undefined));
 });
 
 test("Splice requires compound pointer", () => {
@@ -131,6 +153,34 @@ test("Slot creation and assignment", () => {
   assert.not.ok(domain.trySetSlotDomain(1, sub));
   domain.clearSlot(1);
   assert.ok(domain.trySetSlotDomain(1, sub));
+});
+
+test("Slot requires compound pointer and unique id", () => {
+  const builder = createBuilder();
+  builder.action("primitive");
+  assert.throws(() => builder.slot(1));
+
+  const sequenceBuilder = createBuilder();
+  sequenceBuilder.sequence("seq").slot(1);
+  assert.throws(() => sequenceBuilder.slot(1));
+});
+
+test("Forgotten end keeps pointer on compound task", () => {
+  const builder = createBuilder();
+  builder.sequence("sequence test");
+  assert.ok(builder.pointer instanceof CompoundTask);
+});
+
+test("Executing condition without end keeps pointer on primitive", () => {
+  const builder = createBuilder();
+  builder.action("primitive").executingCondition("valid", () => true);
+  assert.ok(builder.pointer instanceof PrimitiveTask);
+});
+
+test("Do without end keeps pointer on primitive", () => {
+  const builder = createBuilder();
+  builder.action("primitive").do(() => TaskStatus.Success);
+  assert.ok(builder.pointer instanceof PrimitiveTask);
 });
 
 test.run();

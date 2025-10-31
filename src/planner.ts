@@ -233,15 +233,6 @@ class Planner {
 
             this.abortCurrentTask(ctx);
             this.LastStatus = TaskStatus.Failure;
-            this.currentTask = null;
-            this.plan = [];
-            ctx.clearLastMTR();
-            if (ctx.DebugMTR) {
-              ctx.clearLastMTRDebug();
-            }
-            ctx.HasPausedPartialPlan = false;
-            ctx.clearPartialPlanQueue();
-            ctx.IsDirty = false;
 
             return;
           }
@@ -260,16 +251,10 @@ class Planner {
 
               this.abortCurrentTask(ctx);
               this.LastStatus = TaskStatus.Failure;
-              this.currentTask = null;
-              this.plan = [];
 
-              ctx.clearLastMTR();
-              if (ctx.DebugMTR) {
-                ctx.clearLastMTRDebug();
+              if (allowImmediateReplan) {
+                this.tick(domain, ctx, false);
               }
-              ctx.HasPausedPartialPlan = false;
-              ctx.clearPartialPlanQueue();
-              ctx.IsDirty = false;
 
               return;
             }
@@ -311,24 +296,20 @@ class Planner {
             }
 
             this.abortCurrentTask(ctx);
-            this.currentTask = null;
-            this.plan = [];
 
-            ctx.clearLastMTR();
-            if (ctx.DebugMTR) {
-              ctx.clearLastMTRDebug();
+            if (allowImmediateReplan) {
+              this.tick(domain, ctx, false);
             }
-
-            ctx.HasPausedPartialPlan = false;
-            ctx.clearPartialPlanQueue();
-            ctx.IsDirty = false;
           } else if (this.onCurrentTaskContinues) {
             this.onCurrentTaskContinues(this.currentTask);
           }
         } else {
           this.abortCurrentTask(ctx);
-          this.currentTask = null;
           this.LastStatus = TaskStatus.Failure;
+
+          if (allowImmediateReplan) {
+            this.tick(domain, ctx, false);
+          }
         }
       }
 
@@ -353,6 +334,18 @@ class Planner {
     if (this.currentTask instanceof PrimitiveTask) {
       this.currentTask.abort(ctx);
     }
+
+    this.currentTask = null;
+    this.plan = [];
+
+    ctx.clearLastMTR();
+    if (ctx.DebugMTR) {
+      ctx.clearLastMTRDebug();
+    }
+
+    ctx.HasPausedPartialPlan = false;
+    ctx.clearPartialPlanQueue();
+    ctx.IsDirty = false;
   }
 
   getPlan(): Plan {
