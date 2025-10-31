@@ -1,13 +1,9 @@
-// Portions of this file are derived from FluidHTN (MIT License)
-// Copyright (c) 2019 Pål Trefall
-// https://github.com/ptrefall/fluid-hierarchical-task-network
-
 import { test } from "uvu";
 import * as assert from "uvu/assert";
 
-import Effect from "../src/effect.js";
-import EffectType from "../src/effectType.js";
-import * as TestUtil from "./utils.js";
+import Effect from "../src/effect";
+import EffectType from "../src/effectType";
+import * as TestUtil from "./utils";
 
 test("Create simple effect", () => {
   const effectFunction = (context) => {
@@ -97,6 +93,18 @@ test("Effect with incorrect type for action doesn't crash", () => {
   assert.equal(testEffect.Type, type);
   assert.equal(testEffect._effectFunction, effectFunction);
   assert.not(testContext.Done);
+});
+
+test("Effect apply throws when context is invalid", () => {
+  const testEffect = new Effect({
+    name: "Invalid",
+    type: EffectType.PlanOnly,
+    action: () => undefined,
+  });
+
+  assert.throws(() => {
+    testEffect.apply(null);
+  });
 });
 
 test.run();

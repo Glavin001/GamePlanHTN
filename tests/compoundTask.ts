@@ -1,13 +1,9 @@
-// Portions of this file are derived from FluidHTN (MIT License)
-// Copyright (c) 2019 Pål Trefall
-// https://github.com/ptrefall/fluid-hierarchical-task-network
-
 import { test } from "uvu";
 import log from "loglevel";
 import * as assert from "uvu/assert";
 
-import CompoundTask from "../src/Tasks/compoundTask.js";
-import Context from "../src/context.js";
+import CompoundTask from "../src/Tasks/compoundTask";
+import Context from "../src/context";
 
 const prim = {
   name: "foo",
