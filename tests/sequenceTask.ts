@@ -1,12 +1,11 @@
-/* eslint-disable max-statements -- Some tests are long. That's how tests be sometimes. */
 import { test } from "uvu";
 import * as assert from "uvu/assert";
-import ContextState from "../src/contextState.js";
-import DecompositionStatus from "../src/decompositionStatus.js";
-import Effect from "../src/effect.js";
-import EffectType from "../src/effectType.js";
-import * as TestUtil from "./utils.js";
-import PausePlanTask from "../src/Tasks/pausePlanTask.js";
+import ContextState from "../src/contextState";
+import DecompositionStatus from "../src/decompositionStatus";
+import Effect from "../src/effect";
+import EffectType from "../src/effectType";
+import * as TestUtil from "./utils";
+import PausePlanTask from "../src/Tasks/pausePlanTask";
 
 test("Add Condition", () => {
   const task = TestUtil.getEmptySequenceTask("Test");
@@ -267,8 +266,9 @@ test("Decompose Nested Compound Subtask equal to MTR expected behavior", () => {
   assert.equal(status, DecompositionStatus.Succeeded);
   assert.ok(plan);
   assert.equal(plan.length, 2);
-  assert.equal(ctx.MethodTraversalRecord.length, 1);
+  assert.equal(ctx.MethodTraversalRecord.length, 2);
   assert.equal(ctx.MethodTraversalRecord[0], 1);
+  assert.equal(ctx.MethodTraversalRecord[1], 1);
   assert.equal("Sub-task3", plan.shift().Name);
   assert.equal("Sub-task4", plan.shift().Name);
 });

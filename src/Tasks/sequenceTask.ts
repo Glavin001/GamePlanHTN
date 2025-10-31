@@ -1,15 +1,13 @@
-// Portions of this file are derived from FluidHTN (MIT License)
-// Copyright (c) 2019 Pål Trefall
-// https://github.com/ptrefall/fluid-hierarchical-task-network
-
 import log from "loglevel";
-import DecompositionStatus from "../decompositionStatus.js";
-import CompoundTask from "./compoundTask.js";
-import PrimitiveTask from "./primitiveTask.js";
-import PausePlanTask from "./pausePlanTask.js";
+import type Context from "../context";
+import DecompositionStatus from "../decompositionStatus";
+import type { PlanResult } from "../types";
+import CompoundTask, { type CompoundTaskChild } from "./compoundTask";
+import PrimitiveTask from "./primitiveTask";
+import PausePlanTask from "./pausePlanTask";
 
-const isValid = (context, task) => {
-  if (task.defaultValidityTest(context) === false) {
+const isValid = (context: Context, task: CompoundTask): boolean => {
+  if (task.defaultValidityTest(context, task) === false) {
     return false;
   }
 
@@ -21,10 +19,17 @@ const isValid = (context, task) => {
   return true;
 };
 
-// eslint-disable-next-line max-params -- TODO: Fix this
-const onDecomposeCompoundTask = (context, childTask, taskIndex, oldStackDepth, plan, task) => {
+// TODO: Fix this (function currently exceeds max-params just like FluidHTN)
+const onDecomposeCompoundTask = (
+  context: Context,
+  childTask: CompoundTask,
+  taskIndex: number,
+  oldStackDepth: Record<string, number>,
+  plan: PrimitiveTask[],
+  task: CompoundTask,
+): PlanResult => {
   if (context.LogDecomposition) {
-    log.debug(`SequenceTask:OnDecomposeCompoundTask:Decomposing compund task: ${JSON.stringify(plan)}`);
+    log.debug(`SequenceTask:OnDecomposeCompoundTask:Decomposing compound task: ${JSON.stringify(plan)}`);
   }
   const childResult = childTask.decompose(context, 0);
 
@@ -42,6 +47,7 @@ const onDecomposeCompoundTask = (context, childTask, taskIndex, oldStackDepth, p
     return { plan: [], status: DecompositionStatus.Failed };
   }
 
+  // If we successfully decomposed our subtask, add the resulting plan to this plan
   plan.push(...childResult.plan);
   if (context.HasPausedPartialPlan) {
     if (context.LogDecomposition) {
@@ -64,8 +70,16 @@ const onDecomposeCompoundTask = (context, childTask, taskIndex, oldStackDepth, p
   return { plan, status: DecompositionStatus.Succeeded };
 };
 
-// eslint-disable-next-line max-params -- TODO: Fix this
-const onDecomposeTask = (context, childTask, taskIndex, oldStackDepth, plan, task) => {
+// TODO: Fix this (function currently exceeds max-params just like FluidHTN)
+const onDecomposeTask = (
+  context: Context,
+  childTask: CompoundTaskChild,
+  taskIndex: number,
+  oldStackDepth: Record<string, number>,
+  plan: PrimitiveTask[],
+  task: CompoundTask,
+): PlanResult => {
+  // If the task we're evaluating is invalid, return the existing plan as the result
   if (!childTask.isValid(context)) {
     context.trimToStackDepth(oldStackDepth);
 
@@ -105,12 +119,12 @@ const onDecomposeTask = (context, childTask, taskIndex, oldStackDepth, plan, tas
     log.debug(`Sequence.OnDecomposeTask: Returning plan ${JSON.stringify(plan)}.`);
   }
 
-  return { plan, status: (plan.length === 0) ? DecompositionStatus.Failed : DecompositionStatus.Succeeded };
+  return { plan, status: plan.length === 0 ? DecompositionStatus.Failed : DecompositionStatus.Succeeded };
 };
 
 // For a sequence task, all children need to successfully decompose
-const decompose = (context, startIndex, task) => {
-  let result = {
+const decompose = (context: Context, startIndex: number, task: CompoundTask): PlanResult => {
+  let result: PlanResult = {
     plan: [],
     status: DecompositionStatus.Rejected,
   };
@@ -130,6 +144,7 @@ const decompose = (context, startIndex, task) => {
     if (context.LogDecomposition) {
       log.debug(`Sequence.OnDecompose: Received Result: ${JSON.stringify(result)}`);
     }
+
     // If we cannot make a plan OR if any task failed, short circuit this for loop
     if (result.status === DecompositionStatus.Rejected ||
       result.status === DecompositionStatus.Failed ||

@@ -1,74 +1,46 @@
 module.exports = {
+  root: true,
   extends: [
     "@tivac",
+    "plugin:@typescript-eslint/recommended",
     "plugin:eslint-comments/recommended",
   ],
 
-  ignorePatterns: ["coverage/*"],
-  parser: "@babel/eslint-parser",
+  ignorePatterns: ["coverage/*", "dist", "node_modules"],
+  parser: "@typescript-eslint/parser",
 
   parserOptions: {
-    requireConfigFile: false,
+    project: ["./tsconfig.json", "./tsconfig.tests.json"],
+    tsconfigRootDir: __dirname,
+    ecmaVersion: 2020,
+    sourceType: "module",
   },
 
   env: {
     node: true,
-    jest: true,
     es6: true,
   },
 
-  plugins: [],
+  plugins: ["@typescript-eslint"],
 
   reportUnusedDisableDirectives: true,
 
   rules: {
-    "max-statements": [
-      "warn",
-      25,
-    ],
+    "max-statements": "off",
     "newline-after-var": "off",
     "newline-before-return": "off",
     "lines-around-directive": "off",
-    "padding-line-between-statements": [
-      "warn",
-      // Always want a newline before "return"
-      {
-        blankLine: "always", prev: "*", next: "return",
-      },
-      // Newline after variable declarations
-      {
-        blankLine: "always", prev: [
-          "const",
-          "let",
-          "var",
-        ], next: "*",
-      },
-      {
-        blankLine: "any", prev: [
-          "const",
-          "let",
-          "var",
-        ], next: [
-          "const",
-          "let",
-          "var",
-        ],
-      },
-      // Newline after directives
-      {
-        blankLine: "always", prev: "directive", next: "*",
-      },
-      {
-        blankLine: "any", prev: "directive", next: "directive",
-      },
-    ],
-    "no-unused-vars": [
+    "padding-line-between-statements": "off",
+    "@typescript-eslint/no-unused-vars": [
       "warn",
       {
         varsIgnorePattern: "^_",
         argsIgnorePattern: "^_",
       },
     ],
+    "@typescript-eslint/no-use-before-define": "off",
+    "no-use-before-define": "off",
+    "no-shadow": "off",
     // Plugins
     "eslint-comments/require-description": "warn",
     "eslint-comments/disable-enable-pair": [
@@ -83,15 +55,11 @@ module.exports = {
         beforeColon: false,
       },
     ],
-    "keyword-spacing": [
-      "warn",
-      {
-        after: true,
-      },
-    ],
-    "array-bracket-spacing": [
-      "warn",
-      "never",
-    ],
+    "keyword-spacing": ["warn", { after: true }],
+    "array-bracket-spacing": ["warn", "never"],
+    "object-curly-newline": "off",
+    "newline-per-chained-call": "off",
+    "max-params": "off",
+    "prefer-destructuring": "off",
   },
 };

@@ -1,13 +1,8 @@
-// Portions of this file are derived from FluidHTN (MIT License)
-// Copyright (c) 2019 Pål Trefall
-// https://github.com/ptrefall/fluid-hierarchical-task-network
-
-import Context from "../src/context.js";
-import Domain from "../src/domain.js";
-import CompoundTask from "../src/Tasks/compoundTask.js";
-import PrimitiveTask from "../src/Tasks/primitiveTask.js";
-import log from "loglevel";
-import Effect from "../src/effect.js";
+import Context from "../src/context";
+import Domain from "../src/domain";
+import CompoundTask from "../src/Tasks/compoundTask";
+import PrimitiveTask from "../src/Tasks/primitiveTask";
+import Effect from "../src/effect";
 
 function getEmptyTestContext() {
   const context = new Context();
@@ -17,6 +12,8 @@ function getEmptyTestContext() {
     HasB: 0,
     HasC: 0,
   };
+
+  context.Done = false;
 
   return context;
 }
@@ -56,9 +53,6 @@ function getSimplePrimitiveTask(name) {
     name,
     conditions: [],
     effects: [],
-    operator: () => {
-      log.info("test");
-    },
   });
 }
 
