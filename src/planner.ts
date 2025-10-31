@@ -230,6 +230,9 @@ class Planner {
             if (this.onNewTaskConditionFailed) {
               this.onNewTaskConditionFailed(this.currentTask, this.currentTask.Conditions[i]);
             }
+
+            this.abortCurrentTask(ctx);
+            this.LastStatus = TaskStatus.Failure;
             this.currentTask = null;
             this.plan = [];
             ctx.clearLastMTR();
@@ -249,12 +252,14 @@ class Planner {
     if (this.currentTask) {
       if (this.currentTask instanceof PrimitiveTask) {
         if (this.currentTask.operator) {
-          this.currentTask.ExecutingConditions.forEach((condition) => {
+          for (const condition of this.currentTask.ExecutingConditions) {
             if (!condition.func(ctx)) {
               if (this.onCurrentTaskExecutingConditionFailed) {
                 this.onCurrentTaskExecutingConditionFailed(this.currentTask as PrimitiveTask, condition);
               }
 
+              this.abortCurrentTask(ctx);
+              this.LastStatus = TaskStatus.Failure;
               this.currentTask = null;
               this.plan = [];
 
@@ -268,7 +273,7 @@ class Planner {
 
               return;
             }
-          });
+          }
 
           this.LastStatus = this.currentTask?.operator(ctx);
 
@@ -305,6 +310,7 @@ class Planner {
               this.onCurrentTaskFailed(this.currentTask);
             }
 
+            this.abortCurrentTask(ctx);
             this.currentTask = null;
             this.plan = [];
 
@@ -320,6 +326,7 @@ class Planner {
             this.onCurrentTaskContinues(this.currentTask);
           }
         } else {
+          this.abortCurrentTask(ctx);
           this.currentTask = null;
           this.LastStatus = TaskStatus.Failure;
         }
@@ -340,6 +347,12 @@ class Planner {
       this.currentTask.stop(ctx);
     }
     this.currentTask = null;
+  }
+
+  private abortCurrentTask(ctx: Context): void {
+    if (this.currentTask instanceof PrimitiveTask) {
+      this.currentTask.abort(ctx);
+    }
   }
 
   getPlan(): Plan {

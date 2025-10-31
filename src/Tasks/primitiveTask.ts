@@ -22,6 +22,8 @@ export interface PrimitiveTaskConfig {
   operator?: PrimitiveTaskOperator;
   conditions?: TaskCondition[];
   effects?: EffectDefinition[];
+  stop?: (context: Context) => void;
+  abort?: (context: Context) => void;
 }
 
 export type PrimitiveTaskProps = PrimitiveTaskConfig | PrimitiveTaskOperator;
@@ -41,12 +43,16 @@ class PrimitiveTask {
 
   private stopAction?: (context: Context) => void;
 
+  private abortAction?: (context: Context) => void;
+
   constructor(props: PrimitiveTaskProps) {
     if (typeof props === "function") {
       this.operator = props;
     } else {
       this.Name = props.name;
       this.operator = props.operator;
+      this.stopAction = props.stop;
+      this.abortAction = props.abort;
 
       if (Array.isArray(props.conditions)) {
         this.Conditions = props.conditions;
@@ -128,9 +134,20 @@ class PrimitiveTask {
     }
   }
 
-  setOperator(operator: PrimitiveTaskOperator, forceStop?: (context: Context) => void): this {
+  abort(context?: Context): void {
+    if (this.abortAction && context) {
+      this.abortAction(context);
+    }
+  }
+
+  setOperator(
+    operator: PrimitiveTaskOperator | undefined,
+    forceStop?: (context: Context) => void,
+    abort?: (context: Context) => void,
+  ): this {
     this.operator = operator;
     this.stopAction = forceStop;
+    this.abortAction = abort;
 
     return this;
   }

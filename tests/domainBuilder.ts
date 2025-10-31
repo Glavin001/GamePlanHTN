@@ -78,16 +78,25 @@ test("Executing condition requires primitive task", () => {
   assert.is(primitive.ExecutingConditions.length, 1);
 });
 
-test("Do assigns operator", () => {
+test("Do assigns operator with optional handlers", () => {
   const builder = createBuilder();
   let stopped = false;
-  builder.action("primitive").do(() => TaskStatus.Success, () => {
-    stopped = true;
-  });
+  let aborted = false;
+  builder.action("primitive").do(
+    () => TaskStatus.Success,
+    () => {
+      stopped = true;
+    },
+    () => {
+      aborted = true;
+    },
+  );
   const primitive = builder.pointer as PrimitiveTask;
   assert.type(primitive.operator, "function");
   primitive.stop({} as Context);
+  primitive.abort({} as Context);
   assert.ok(stopped);
+  assert.ok(aborted);
 });
 
 test("Effect attaches to primitive", () => {

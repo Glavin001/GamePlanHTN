@@ -87,9 +87,17 @@ class DomainBuilder<TContext extends Context = Context> {
     return this;
   }
 
-  do(operator: PrimitiveTaskOperator, forceStopAction?: (context: TContext) => void): this {
+  do(
+    operator: PrimitiveTaskOperator,
+    forceStopAction?: (context: TContext) => void,
+    abortAction?: (context: TContext) => void,
+  ): this {
     const primitive = this.ensurePrimitivePointer();
-    primitive.setOperator(operator, forceStopAction as unknown as (context: Context) => void);
+    primitive.setOperator(
+      operator,
+      forceStopAction as unknown as (context: Context) => void,
+      abortAction as unknown as (context: Context) => void,
+    );
 
     return this;
   }

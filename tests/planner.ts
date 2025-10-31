@@ -87,6 +87,37 @@ test("Tick with primitive task without operator expected behavior ", () => {
   assert.equal(planner.LastStatus, TaskStatus.Failure);
 });
 
+test("Planner aborts task when runtime condition fails", () => {
+  const ctx = TestUtil.getEmptyTestContext();
+
+  ctx.init();
+  const planner = new Planner();
+  const domain = TestUtil.getEmptyTestDomain();
+  const task1 = TestUtil.getEmptySelectorTask("Test");
+  let callCount = 0;
+  let aborted = false;
+  const task2 = new PrimitiveTask({
+    name: "Conditional",
+    operator: () => TaskStatus.Success,
+    abort: () => {
+      aborted = true;
+    },
+  });
+
+  task2.addCondition(() => {
+    callCount += 1;
+    return callCount === 1;
+  });
+
+  domain.add(domain.Root, task1);
+  domain.add(task1, task2);
+
+  planner.tick(domain, ctx);
+
+  assert.ok(aborted);
+  assert.equal(planner.LastStatus, TaskStatus.Failure);
+});
+
 test("Tick with operator with null function expected behavior ", () => {
   const ctx = TestUtil.getEmptyTestContext();
 
@@ -150,6 +181,61 @@ test("Tick with default continue operator expected behavior", () => {
 
   assert.ok(currentTask);
   assert.equal(planner.LastStatus, TaskStatus.Continue);
+});
+
+test("Planner aborts task when executing condition fails", () => {
+  const ctx = TestUtil.getEmptyTestContext();
+
+  ctx.init();
+  const planner = new Planner();
+  const domain = TestUtil.getEmptyTestDomain();
+  const task1 = TestUtil.getEmptySelectorTask("Test");
+  let aborted = false;
+  const task2 = new PrimitiveTask({
+    name: "Exec conditional",
+    operator: () => TaskStatus.Continue,
+    abort: () => {
+      aborted = true;
+    },
+  });
+
+  task2.addExecutingCondition({
+    Name: "Fails",
+    func: () => false,
+  });
+
+  domain.add(domain.Root, task1);
+  domain.add(task1, task2);
+
+  planner.tick(domain, ctx);
+
+  assert.ok(aborted);
+  assert.equal(planner.LastStatus, TaskStatus.Failure);
+});
+
+test("Planner aborts task when operator fails", () => {
+  const ctx = TestUtil.getEmptyTestContext();
+
+  ctx.init();
+  const planner = new Planner();
+  const domain = TestUtil.getEmptyTestDomain();
+  const task1 = TestUtil.getEmptySelectorTask("Test");
+  let aborted = false;
+  const task2 = new PrimitiveTask({
+    name: "Fails",
+    operator: () => TaskStatus.Failure,
+    abort: () => {
+      aborted = true;
+    },
+  });
+
+  domain.add(domain.Root, task1);
+  domain.add(task1, task2);
+
+  planner.tick(domain, ctx);
+
+  assert.ok(aborted);
+  assert.equal(planner.LastStatus, TaskStatus.Failure);
 });
 
 test("On New Plan expected behavior ", () => {

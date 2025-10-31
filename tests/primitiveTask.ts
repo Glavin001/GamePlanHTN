@@ -9,6 +9,7 @@ import * as assert from "uvu/assert";
 import PrimitiveTask from "../src/Tasks/primitiveTask";
 import Context from "../src/context";
 import Effect from "../src/effect";
+import TaskStatus from "../src/taskStatus";
 
 function getTestContext() {
   const context = new Context();
@@ -128,6 +129,50 @@ test("Applying effects, expected behavior ", () => {
   task.applyEffects(ctx);
 
   assert.ok(ctx.Done);
+});
+
+test("Stop and abort handlers trigger when configured", () => {
+  const context = new Context();
+  context.init();
+  const stopped: Context[] = [];
+  const aborted: Context[] = [];
+  const task = new PrimitiveTask({
+    name: "Handlers",
+    operator: () => TaskStatus.Success,
+  });
+
+  task.setOperator(
+    () => TaskStatus.Success,
+    (ctx) => {
+      stopped.push(ctx);
+    },
+    (ctx) => {
+      aborted.push(ctx);
+    },
+  );
+
+  task.stop(context);
+  task.abort(context);
+
+  assert.is(stopped.length, 1);
+  assert.is(aborted.length, 1);
+});
+
+test("Abort handler from config is invoked", () => {
+  const context = new Context();
+  context.init();
+  let aborted = false;
+  const task = new PrimitiveTask({
+    name: "Configured",
+    operator: () => TaskStatus.Success,
+    abort: () => {
+      aborted = true;
+    },
+  });
+
+  task.abort(context);
+
+  assert.ok(aborted);
 });
 
 test.run();
