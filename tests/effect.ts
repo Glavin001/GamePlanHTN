@@ -5,9 +5,9 @@
 import { test } from "uvu";
 import * as assert from "uvu/assert";
 
-import Effect from "../src/effect.js";
-import EffectType from "../src/effectType.js";
-import * as TestUtil from "./utils.js";
+import Effect from "../src/effect";
+import EffectType from "../src/effectType";
+import * as TestUtil from "./utils";
 
 test("Create simple effect", () => {
   const effectFunction = (context) => {

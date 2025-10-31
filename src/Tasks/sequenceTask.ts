@@ -3,17 +3,18 @@
 // https://github.com/ptrefall/fluid-hierarchical-task-network
 
 import log from "loglevel";
-import DecompositionStatus from "../decompositionStatus.js";
-import CompoundTask from "./compoundTask.js";
-import PrimitiveTask from "./primitiveTask.js";
-import PausePlanTask from "./pausePlanTask.js";
+import type Context from "../context";
+import DecompositionStatus from "../decompositionStatus";
+import type { PlanResult } from "../types";
+import CompoundTask, { type CompoundTaskChild } from "./compoundTask";
+import PrimitiveTask from "./primitiveTask";
+import PausePlanTask from "./pausePlanTask";
 
-const isValid = (context, task) => {
-  if (task.defaultValidityTest(context) === false) {
+const isValid = (context: Context, task: CompoundTask): boolean => {
+  if (task.defaultValidityTest(context, task) === false) {
     return false;
   }
 
-  // A sequence with 0 children is not valid
   if (task.Children.length === 0) {
     return false;
   }
@@ -21,21 +22,25 @@ const isValid = (context, task) => {
   return true;
 };
 
-// eslint-disable-next-line max-params -- TODO: Fix this
-const onDecomposeCompoundTask = (context, childTask, taskIndex, oldStackDepth, plan, task) => {
+const onDecomposeCompoundTask = (
+  context: Context,
+  childTask: CompoundTask,
+  taskIndex: number,
+  oldStackDepth: Record<string, number>,
+  plan: PrimitiveTask[],
+  task: CompoundTask,
+): PlanResult => {
   if (context.LogDecomposition) {
-    log.debug(`SequenceTask:OnDecomposeCompoundTask:Decomposing compund task: ${JSON.stringify(plan)}`);
+    log.debug(`SequenceTask:OnDecomposeCompoundTask:Decomposing compound task: ${JSON.stringify(plan)}`);
   }
   const childResult = childTask.decompose(context, 0);
 
-  // If result is null, that means the entire planning procedure should cancel.
   if (childResult.status === DecompositionStatus.Rejected) {
     context.trimToStackDepth(oldStackDepth);
 
     return { plan: [], status: DecompositionStatus.Rejected };
   }
 
-  // If the decomposition failed
   if (childResult.status === DecompositionStatus.Failed) {
     context.trimToStackDepth(oldStackDepth);
 
@@ -64,8 +69,14 @@ const onDecomposeCompoundTask = (context, childTask, taskIndex, oldStackDepth, p
   return { plan, status: DecompositionStatus.Succeeded };
 };
 
-// eslint-disable-next-line max-params -- TODO: Fix this
-const onDecomposeTask = (context, childTask, taskIndex, oldStackDepth, plan, task) => {
+const onDecomposeTask = (
+  context: Context,
+  childTask: CompoundTaskChild,
+  taskIndex: number,
+  oldStackDepth: Record<string, number>,
+  plan: PrimitiveTask[],
+  task: CompoundTask,
+): PlanResult => {
   if (!childTask.isValid(context)) {
     context.trimToStackDepth(oldStackDepth);
 
@@ -105,12 +116,11 @@ const onDecomposeTask = (context, childTask, taskIndex, oldStackDepth, plan, tas
     log.debug(`Sequence.OnDecomposeTask: Returning plan ${JSON.stringify(plan)}.`);
   }
 
-  return { plan, status: (plan.length === 0) ? DecompositionStatus.Failed : DecompositionStatus.Succeeded };
+  return { plan, status: plan.length === 0 ? DecompositionStatus.Failed : DecompositionStatus.Succeeded };
 };
 
-// For a sequence task, all children need to successfully decompose
-const decompose = (context, startIndex, task) => {
-  let result = {
+const decompose = (context: Context, startIndex: number, task: CompoundTask): PlanResult => {
+  let result: PlanResult = {
     plan: [],
     status: DecompositionStatus.Rejected,
   };
@@ -124,13 +134,12 @@ const decompose = (context, startIndex, task) => {
       log.debug(`Sequence.OnDecompose:Task index: ${index}: ${childTask?.Name}`);
     }
 
-    // Note: result and plan will be mutated by this function
     result = onDecomposeTask(context, childTask, index, oldStackDepth, result.plan, task);
 
     if (context.LogDecomposition) {
       log.debug(`Sequence.OnDecompose: Received Result: ${JSON.stringify(result)}`);
     }
-    // If we cannot make a plan OR if any task failed, short circuit this for loop
+
     if (result.status === DecompositionStatus.Rejected ||
       result.status === DecompositionStatus.Failed ||
       result.status === DecompositionStatus.Partial) {

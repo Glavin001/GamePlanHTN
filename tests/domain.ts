@@ -6,13 +6,13 @@
 import { test } from "uvu";
 import * as assert from "uvu/assert";
 import log from "loglevel";
-import Domain from "../src/domain.js";
-import TaskStatus from "../src/taskStatus.js";
-import DecompositionStatus from "../src/decompositionStatus.js";
-import * as TestUtil from "./utils.js";
-import ContextState from "../src/contextState.js";
-import EffectType from "../src/effectType.js";
-import PausePlanTask from "../src/Tasks/pausePlanTask.js";
+import Domain from "../src/domain";
+import TaskStatus from "../src/taskStatus";
+import DecompositionStatus from "../src/decompositionStatus";
+import * as TestUtil from "./utils";
+import ContextState from "../src/contextState";
+import EffectType from "../src/effectType";
+import PausePlanTask from "../src/Tasks/pausePlanTask";
 
 log.enableAll();
 

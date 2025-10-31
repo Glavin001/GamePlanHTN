@@ -6,9 +6,9 @@ import { test } from "uvu";
 import log from "loglevel";
 import * as assert from "uvu/assert";
 
-import PrimitiveTask from "../src/Tasks/primitiveTask.js";
-import Context from "../src/context.js";
-import Effect from "../src/effect.js";
+import PrimitiveTask from "../src/Tasks/primitiveTask";
+import Context from "../src/context";
+import Effect from "../src/effect";
 
 function getTestContext() {
   const context = new Context();

@@ -4,13 +4,13 @@
 
 import { test } from "uvu";
 import * as assert from "uvu/assert";
-import ContextState from "../src/contextState.js";
-import Effect from "../src/effect.js";
-import EffectType from "../src/effectType.js";
-import Planner from "../src/planner.js";
-import PrimitiveTask from "../src/Tasks/primitiveTask.js";
-import TaskStatus from "../src/taskStatus.js";
-import * as TestUtil from "./utils.js";
+import ContextState from "../src/contextState";
+import Effect from "../src/effect";
+import EffectType from "../src/effectType";
+import Planner from "../src/planner";
+import PrimitiveTask from "../src/Tasks/primitiveTask";
+import TaskStatus from "../src/taskStatus";
+import * as TestUtil from "./utils";
 
 
 test("Get Plan returns instance at start ", () => {

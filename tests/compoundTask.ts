@@ -6,8 +6,8 @@ import { test } from "uvu";
 import log from "loglevel";
 import * as assert from "uvu/assert";
 
-import CompoundTask from "../src/Tasks/compoundTask.js";
-import Context from "../src/context.js";
+import CompoundTask from "../src/Tasks/compoundTask";
+import Context from "../src/context";
 
 const prim = {
   name: "foo",

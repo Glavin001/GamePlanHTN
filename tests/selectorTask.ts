@@ -1,7 +1,7 @@
 import { test } from "uvu";
 import * as assert from "uvu/assert";
-import DecompositionStatus from "../src/decompositionStatus.js";
-import * as TestUtil from "./utils.js";
+import DecompositionStatus from "../src/decompositionStatus";
+import * as TestUtil from "./utils";
 
 test("Add condition expected behavior", () => {
   const task = TestUtil.getEmptySelectorTask("Test");

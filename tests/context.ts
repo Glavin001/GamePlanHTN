@@ -4,9 +4,9 @@
 
 import { test } from "uvu";
 import * as assert from "uvu/assert";
-import ContextState from "../src/contextState.js";
-import EffectType from "../src/effectType.js";
-import * as TestUtil from "./utils.js";
+import ContextState from "../src/contextState";
+import EffectType from "../src/effectType";
+import * as TestUtil from "./utils";
 
 
 test("Context defaults to Executing", () => {

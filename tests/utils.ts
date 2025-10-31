@@ -2,12 +2,12 @@
 // Copyright (c) 2019 Pål Trefall
 // https://github.com/ptrefall/fluid-hierarchical-task-network
 
-import Context from "../src/context.js";
-import Domain from "../src/domain.js";
-import CompoundTask from "../src/Tasks/compoundTask.js";
-import PrimitiveTask from "../src/Tasks/primitiveTask.js";
+import Context from "../src/context";
+import Domain from "../src/domain";
+import CompoundTask from "../src/Tasks/compoundTask";
+import PrimitiveTask from "../src/Tasks/primitiveTask";
 import log from "loglevel";
-import Effect from "../src/effect.js";
+import Effect from "../src/effect";
 
 function getEmptyTestContext() {
   const context = new Context();
