@@ -116,6 +116,7 @@ const onDecomposeTask = (context: Context, childTask: CompoundTaskChild, taskInd
   return result;
 };
 
+// For a selector task, only one child needs to successfully decompose
 const decompose = (context: Context, startIndex: number, task: CompoundTask): PlanResult => {
   let result: PlanResult = {
     plan: [],
