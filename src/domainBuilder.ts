@@ -76,13 +76,13 @@ class DomainBuilder<TContext extends Context = Context> {
     return this;
   }
 
-  condition(_name: string, condition: TaskCondition): this {
+  condition(_name: string, condition: TaskCondition<TContext>): this {
     this.pointer.addCondition(condition);
 
     return this;
   }
 
-  executingCondition(name: string, condition: TaskCondition): this {
+  executingCondition(name: string, condition: TaskCondition<TContext>): this {
     const primitive = this.ensurePrimitivePointer();
     primitive.addExecutingCondition({ Name: name, func: condition });
 
