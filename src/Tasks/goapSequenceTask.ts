@@ -13,6 +13,62 @@ interface GoapNode {
   plan: PrimitiveTask[];
 }
 
+const expandChild = (
+  context: Context,
+  current: GoapNode,
+  child: CompoundTaskChild,
+  childIndex: number,
+): GoapNode | null => {
+  const virtualContext = createVirtualContext(context, current.world);
+
+  if (!child.isValid(virtualContext)) {
+    return null;
+  }
+
+  if (child instanceof PrimitiveTask) {
+    const edgeCost = child.getGoapCost(virtualContext);
+    child.applyEffects(virtualContext);
+
+    return {
+      cost: current.cost + edgeCost,
+      world: snapshotWorldState(virtualContext),
+      plan: [...current.plan, child],
+    };
+  }
+
+  if (child instanceof CompoundTask) {
+    virtualContext.MethodTraversalRecord.push(childIndex);
+    const compoundBaseCost = child.getGoapCost(virtualContext);
+
+    const result = child.decompose(virtualContext, 0);
+
+    if (result.status === DecompositionStatus.Rejected) {
+      return null;
+    }
+
+    if (result.status === DecompositionStatus.Failed || result.plan.length === 0) {
+      return null;
+    }
+
+    const nextWorld = snapshotWorldState(virtualContext);
+    const costContext = createVirtualContext(context, current.world);
+    let accumulatedCost = compoundBaseCost;
+
+    for (const primitive of result.plan) {
+      accumulatedCost += primitive.getGoapCost(costContext);
+      primitive.applyEffects(costContext);
+    }
+
+    return {
+      cost: current.cost + accumulatedCost,
+      world: nextWorld,
+      plan: [...current.plan, ...result.plan],
+    };
+  }
+
+  return null;
+};
+
 const isValid = (context: Context, task: CompoundTask): boolean => {
   if (task.defaultValidityTest(context, task) === false) {
     return false;
@@ -88,18 +144,6 @@ const isGoalSatisfied = (goal: Record<string, number>, world: WorldState): boole
   return true;
 };
 
-const getPrimitiveChildren = (task: CompoundTask): PrimitiveTask[] => {
-  const primitives: PrimitiveTask[] = [];
-
-  for (const child of task.Children) {
-    if (child instanceof PrimitiveTask) {
-      primitives.push(child);
-    }
-  }
-
-  return primitives;
-};
-
 const decompose = (context: Context, _startIndex: number, task: CompoundTask): PlanResult => {
   if (!task.Goal) {
     if (context.LogDecomposition) {
@@ -112,9 +156,7 @@ const decompose = (context: Context, _startIndex: number, task: CompoundTask): P
     };
   }
 
-  const primitives = getPrimitiveChildren(task);
-
-  if (primitives.length === 0) {
+  if (task.Children.length === 0) {
     if (context.LogDecomposition) {
       log.debug(`GOAPSequence.OnDecompose:No primitive children available.`);
     }
@@ -164,26 +206,11 @@ const decompose = (context: Context, _startIndex: number, task: CompoundTask): P
       };
     }
 
-    for (const primitive of primitives) {
-      const virtualContext = createVirtualContext(context, current.world);
-
-      if (!primitive.isValid(virtualContext)) {
-        continue;
+    for (const [childIndex, child] of task.Children.entries()) {
+      const node = expandChild(context, current, child, childIndex);
+      if (node) {
+        open.push(node);
       }
-
-      primitive.applyEffects(virtualContext);
-
-      const nextWorld = snapshotWorldState(virtualContext);
-      const edgeCost = primitive.getGoapCost(virtualContext);
-      const totalCost = current.cost + edgeCost;
-
-      const nextPlan = [...current.plan, primitive];
-
-      open.push({
-        cost: totalCost,
-        world: nextWorld,
-        plan: nextPlan,
-      });
     }
   }
 

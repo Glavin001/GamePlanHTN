@@ -246,21 +246,43 @@ DomainBuilder.begin("Gathering")
 - Each child is a primitive `.goapAction(name, costFn?)`. Omit the second argument for the default cost of `1`, or supply a function returning a numeric cost.
 - Costs accumulate across the plan; the planner always returns the lowest-cost valid path while avoiding world-state cycles.
 - If the goal is already satisfied, the sequence succeeds with an empty plan (no-op).
+- Cost/score functions receive the live planning context, so you can compute dynamic values (distance, equipment modifiers, injuries, etc.).
 
 ```ts
+const distance = (from: string, to: string) => Math.abs(/* ... */);
+
 DomainBuilder.begin("Heist")
   .goapSequence("CrackSafe", { HasLoot: 1 })
-    .goapAction("PickLock", () => 2)
-      .condition("Has Lockpick", (ctx) => ctx.hasState("Lockpick"))
-      .effect("DoorOpen", EffectType.PlanOnly, (ctx, type) => ctx.setState("DoorOpen", 1, false, type))
+    .sequence("Stealth Route")
+      .cost(() => 2) // base cost for choosing this compound branch
+      .action("PickLock")
+        .condition("Has Lockpick", (ctx) => ctx.hasState("Lockpick"))
+        .effect("DoorOpen", EffectType.PlanOnly, (ctx, type) => ctx.setState("DoorOpen", 1, false, type))
+      .end()
+      .action("GrabLoot")
+        .condition("DoorOpen", (ctx) => ctx.hasState("DoorOpen"))
+        .effect("HasLoot", EffectType.PlanOnly, (ctx, type) => ctx.setState("HasLoot", 1, false, type))
+      .end()
     .end()
-    .goapAction("BlowDoor", () => 10)
-      .condition("Has Explosives", (ctx) => ctx.hasState("Explosives"))
-      .effect("DoorOpen", EffectType.PlanOnly, (ctx, type) => ctx.setState("DoorOpen", 1, false, type))
+    .goapAction("WalkToVan", (ctx) => {
+      const meters = distance(ctx.getState("AgentNode"), "GetawayVan");
+      const injuryFactor = ctx.hasState("LegInjured") ? 2 : 1;
+      return meters * injuryFactor; // walking is slower if injured
+    })
+      .effect("ReachVan", EffectType.PlanOnly, (ctx, type) => {
+        ctx.setState("AgentNode", "GetawayVan", false, type);
+      })
     .end()
-    .goapAction("GrabLoot")
-      .condition("DoorOpen", (ctx) => ctx.hasState("DoorOpen"))
-      .effect("HasLoot", EffectType.PlanOnly, (ctx, type) => ctx.setState("HasLoot", 1, false, type))
+    .goapAction("DriveToVan", (ctx) => {
+      if (!ctx.hasState("HasVehicle")) {
+        return Number.POSITIVE_INFINITY;
+      }
+      const meters = distance(ctx.getState("AgentNode"), "GetawayVan");
+      return meters * 0.5; // driving is faster
+    })
+      .effect("ReachVan", EffectType.PlanOnly, (ctx, type) => {
+        ctx.setState("AgentNode", "GetawayVan", false, type);
+      })
     .end()
   .end()
   .end();

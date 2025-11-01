@@ -113,8 +113,15 @@ class DomainBuilder<TContext extends Context = Context> {
   }
 
   cost(costFn: (context: TContext) => number): this {
-    const primitive = this.ensurePrimitivePointer();
-    primitive.setGoapCost(costFn as unknown as (context: Context) => number);
+    const pointer = this.pointer;
+
+    if (pointer instanceof PrimitiveTask) {
+      pointer.setGoapCost(costFn as unknown as (context: Context) => number);
+    } else if (pointer instanceof CompoundTask) {
+      pointer.setGoapCost(costFn as unknown as (context: Context) => number);
+    } else {
+      throw new Error("Cost can only be assigned to tasks");
+    }
 
     return this;
   }

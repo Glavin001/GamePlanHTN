@@ -368,5 +368,144 @@ test("GOAP sequence succeeds immediately when goal already satisfied", () => {
   assert.equal(plan.length, 0);
 });
 
+test("GOAP sequence expands compound children and propagates cost", () => {
+  const builder = new DomainBuilder<Context>("GOAP Compound Test");
+
+  builder.goapSequence("Secure Loot", { HasLoot: 1 });
+
+  builder
+    .sequence("Stealth Route")
+    .cost(() => 2)
+    .action("PickLock")
+      .condition("Door closed", (context) => !context.hasState("DoorOpen"))
+      .do(() => TaskStatus.Success)
+      .effect("DoorOpen", EffectType.PlanOnly, (context, effectType) => {
+        context.setState("DoorOpen", 1, false, effectType ?? EffectType.PlanOnly);
+      })
+    .end()
+    .action("GrabLoot")
+      .condition("Door open", (context) => context.hasState("DoorOpen"))
+      .condition("No loot", (context) => !context.hasState("HasLoot"))
+      .do(() => TaskStatus.Success)
+      .effect("HasLoot", EffectType.PlanOnly, (context, effectType) => {
+        context.setState("HasLoot", 1, false, effectType ?? EffectType.PlanOnly);
+      })
+    .end()
+  .end();
+
+  builder
+    .goapAction("BlastDoor", () => 8)
+    .condition("No loot", (context) => !context.hasState("HasLoot"))
+    .do(() => TaskStatus.Success)
+    .effect("HasLoot", EffectType.PlanOnly, (context, effectType) => {
+      context.setState("HasLoot", 1, false, effectType ?? EffectType.PlanOnly);
+    })
+  .end();
+
+  builder.end();
+
+  const domain = builder.build();
+  const ctx = new Context();
+  ctx.WorldState = {
+    DoorOpen: 0,
+    HasLoot: 0,
+  };
+  ctx.init();
+
+  const { status, plan } = domain.findPlan(ctx);
+
+  assert.equal(status, DecompositionStatus.Succeeded);
+  assert.ok(plan);
+  assert.equal(plan.length, 2);
+  assert.is(plan[0].Name, "PickLock");
+  assert.is(plan[1].Name, "GrabLoot");
+});
+
+test("GOAP dynamic costs respond to injury and vehicle state", () => {
+  const builder = new DomainBuilder<Context>("GOAP Dynamic Cost Test");
+
+  const movementGoal = { AtTarget: 1 };
+  const targetNode = "B";
+
+  const distance = (from: string, to: string): number => {
+    const coords: Record<string, [number, number]> = {
+      A: [0, 0],
+      B: [3, 0],
+      C: [1, 2],
+    };
+    const [fx, fy] = coords[from];
+    const [tx, ty] = coords[to];
+    const dx = fx - tx;
+    const dy = fy - ty;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  builder.goapSequence("ReachTarget", movementGoal);
+
+  builder
+    .goapAction("WalkToTarget", (context) => {
+      const from = context.getState("AgentNode");
+      const meters = distance(from, targetNode);
+      const injuryMultiplier = context.hasState("LegInjured") ? 2 : 1;
+      return meters * injuryMultiplier;
+    })
+    .do(() => TaskStatus.Success)
+    .effect("Update position", EffectType.PlanOnly, (context, effectType) => {
+      context.setState("AgentNode", targetNode, false, effectType ?? EffectType.PlanOnly);
+      context.setState("AtTarget", 1, false, effectType ?? EffectType.PlanOnly);
+    })
+  .end();
+
+  builder
+    .goapAction("DriveToTarget", (context) => {
+      const hasVehicle = context.hasState("HasVehicle");
+      if (!hasVehicle) {
+        return Number.POSITIVE_INFINITY;
+      }
+      const from = context.getState("AgentNode");
+      const meters = distance(from, targetNode);
+      // driving is cheaper per meter
+      return meters * 0.5;
+    })
+    .do(() => TaskStatus.Success)
+    .effect("Drive", EffectType.PlanOnly, (context, effectType) => {
+      context.setState("AgentNode", targetNode, false, effectType ?? EffectType.PlanOnly);
+      context.setState("AtTarget", 1, false, effectType ?? EffectType.PlanOnly);
+    })
+  .end();
+
+  builder.end();
+
+  const domain = builder.build();
+
+  const walkCtx = new Context();
+  walkCtx.WorldState = {
+    AgentNode: "A",
+    AtTarget: 0,
+    LegInjured: 1,
+    HasVehicle: 0,
+  };
+  walkCtx.init();
+
+  const driveCtx = new Context();
+  driveCtx.WorldState = {
+    AgentNode: "A",
+    AtTarget: 0,
+    LegInjured: 1,
+    HasVehicle: 1,
+  };
+  driveCtx.init();
+
+  const walkPlan = domain.findPlan(walkCtx);
+  assert.equal(walkPlan.status, DecompositionStatus.Succeeded);
+  assert.equal(walkPlan.plan.length, 1);
+  assert.is(walkPlan.plan[0].Name, "WalkToTarget");
+
+  const drivePlan = domain.findPlan(driveCtx);
+  assert.equal(drivePlan.status, DecompositionStatus.Succeeded);
+  assert.equal(drivePlan.plan.length, 1);
+  assert.is(drivePlan.plan[0].Name, "DriveToTarget");
+});
+
 test.run();
 

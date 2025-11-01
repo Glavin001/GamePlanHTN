@@ -44,6 +44,8 @@ class CompoundTask {
 
   private utilityScore?: (context: Context) => number;
 
+  private goapCost?: (context: Context) => number;
+
   public Goal?: Record<string, number>;
 
   constructor({ name, tasks, type, conditions, goal }: CompoundTaskConfig) {
@@ -160,6 +162,20 @@ class CompoundTask {
   getUtilityScore(context: Context): number {
     if (typeof this.utilityScore === "function") {
       return this.utilityScore(context);
+    }
+
+    return 0;
+  }
+
+  setGoapCost(cost?: (context: Context) => number): this {
+    this.goapCost = cost;
+
+    return this;
+  }
+
+  getGoapCost(context: Context): number {
+    if (typeof this.goapCost === "function") {
+      return this.goapCost(context);
     }
 
     return 0;
