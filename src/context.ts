@@ -1,36 +1,55 @@
-// Portions of this file are derived from FluidHTN (MIT License)
-// Copyright (c) 2019 Pål Trefall
-// https://github.com/ptrefall/fluid-hierarchical-task-network
+import { ContextState, ContextStateValue } from "./contextState";
+import EffectType, { EffectTypeValue } from "./effectType";
+import type CompoundTask from "./Tasks/compoundTask";
 
+export interface WorldStateChange {
+  effectType: EffectTypeValue;
+  value: number;
+}
 
-// eslint-disable-next-line no-unused-vars -- Keep a reference to logger for ease of development
-import log from "loglevel";
-import ContextState from "./contextState.js";
-import EffectType from "./effectType.js";
+export type WorldState = Record<string, number>;
+export type WorldStateChangeStack = Record<string, WorldStateChange[]>;
+
+export interface PartialPlanEntry {
+  task: CompoundTask;
+  taskIndex: number;
+}
 
 class Context {
-  constructor() {
-    this.IsInitialized = false;
-    this.IsDirty = false;
-    this.ContextState = ContextState.Executing;
-    this.CurrentDecompositionDepth = 0;
-    this.WorldState = {};
-    this.LastMTR = [];
-    this.MethodTraversalRecord = [];
-    this.WorldStateChangeStack = null;
-    this.MTRDebug = [];
-    this.LastMTRDebug = [];
-    this.DebugMTR = false;
-    this.PartialPlanQueue = [];
-    this.DecompositionLog = [];
-    this.LogDecomposition = false;
-    this.HasPausedPartialPlan = false;
-  }
+  public IsInitialized = false;
 
-  init() {
+  public IsDirty = false;
+
+  public ContextState: ContextStateValue = ContextState.Executing;
+
+  public CurrentDecompositionDepth = 0;
+
+  public WorldState: WorldState = {};
+
+  public LastMTR: number[] = [];
+
+  public MethodTraversalRecord: number[] = [];
+
+  public WorldStateChangeStack: WorldStateChangeStack | null = null;
+
+  public MTRDebug: string[] = [];
+
+  public LastMTRDebug: string[] = [];
+
+  public DebugMTR = false;
+
+  public PartialPlanQueue: PartialPlanEntry[] = [];
+
+  public DecompositionLog: string[] = [];
+
+  public LogDecomposition = false;
+
+  public HasPausedPartialPlan = false;
+
+  init(): void {
     if (!this.WorldStateChangeStack) {
       this.WorldStateChangeStack = {};
-      for (const stateKey in this.WorldState) {
+      for (const stateKey of Object.keys(this.WorldState)) {
         this.WorldStateChangeStack[stateKey] = [];
       }
     }
@@ -55,7 +74,7 @@ class Context {
 
   // The `HasState` method returns `true` if the value of the state at the specified index in the `WorldState` array
   // is equal to the specified value. Otherwise, it returns `false`.
-  hasState(state, value = 1) {
+  hasState(state: string, value = 1): boolean {
     return this.getState(state) === value;
   }
 
@@ -63,16 +82,17 @@ class Context {
   // If the `ContextState` is `ContextState.Executing`, it returns the value from the `WorldState` array directly.
   // Otherwise, it returns the value of the topmost object in the `WorldStateChangeStack` array at the specified index,
   // or the value from the `WorldState` array if the stack is empty.
-  getState(state) {
+  getState(state: string): number {
     if (this.ContextState === ContextState.Executing) {
       return this.WorldState[state];
     }
 
-    if (this.WorldStateChangeStack[state].length === 0) {
+    const stack = this.WorldStateChangeStack?.[state];
+    if (!stack || stack.length === 0) {
       return this.WorldState[state];
     }
 
-    return this.WorldStateChangeStack[state][0].value;
+    return stack[0].value;
   }
 
   // The `SetState` method sets the value of the state at the specified index in the `WorldState` array.
@@ -80,7 +100,7 @@ class Context {
   // and the value of the state is not already equal to the specified value.
   // Otherwise, it adds a new object to the `WorldStateChangeStack` array at the specified index with properties
   // "effectType" and "value".
-  setState(state, value = 1, setAsDirty = true, e = EffectType.Permanent) {
+  setState(state: string, value = 1, setAsDirty = true, effectType: EffectTypeValue = EffectType.Permanent): void {
     if (this.ContextState === ContextState.Executing) {
       // Prevent setting the world state dirty if we're not changing anything.
       if (this.WorldState[state] === value) {
@@ -93,8 +113,14 @@ class Context {
         this.IsDirty = true;
       }
     } else {
+      if (!this.WorldStateChangeStack) {
+        this.WorldStateChangeStack = {};
+      }
+      if (!this.WorldStateChangeStack[state]) {
+        this.WorldStateChangeStack[state] = [];
+      }
       this.WorldStateChangeStack[state].push({
-        effectType: e,
+        effectType,
         value,
       });
     }
@@ -103,7 +129,7 @@ class Context {
   // The `Reset` method clears the `MethodTraversalRecord` and `LastMTR` arrays.
   // If `DebugMTR` is `true`, it also clears the `MTRDebug` and `LastMTRDebug` arrays.
   // Finally, it sets the `IsInitialized` property to `false`.
-  reset() {
+  reset(): void {
     this.MethodTraversalRecord = [];
     this.LastMTR = [];
 
@@ -115,15 +141,19 @@ class Context {
     this.IsInitialized = false;
   }
 
-
   // The `GetWorldStateChangeDepth` method returns an array containing the
   // length of each stack in the `WorldStateChangeStack` array. If a stack
   // is `null`, its length is `0`.
-  getWorldStateChangeDepth() {
-    const stackDepth = {};
+  getWorldStateChangeDepth(): Record<string, number> {
+    if (!this.WorldStateChangeStack) {
+      throw new Error("World state change stack has not been initialized");
+    }
+
+    const stackDepth: Record<string, number> = {};
 
     for (const worldStateKey of Object.keys(this.WorldStateChangeStack)) {
-      stackDepth[worldStateKey] = (this.WorldStateChangeStack[worldStateKey] ? this.WorldStateChangeStack[worldStateKey].length : 0);
+      const stack = this.WorldStateChangeStack[worldStateKey];
+      stackDepth[worldStateKey] = stack ? stack.length : 0;
     }
 
     return stackDepth;
@@ -132,13 +162,21 @@ class Context {
   // The `TrimForExecution` method trims the `WorldStateChangeStack` array
   // by removing all elements that are not of type `EffectType.Permanent`.
   // If the `ContextState` is `ContextState.Executing`, an error is thrown.
-  trimForExecution() {
+  trimForExecution(): void {
     if (this.ContextState === ContextState.Executing) {
       throw new Error("Can not trim a context when in execution mode");
     }
 
+    if (!this.WorldStateChangeStack) {
+      return;
+    }
+
     for (const worldStateKey of Object.keys(this.WorldStateChangeStack)) {
       const stack = this.WorldStateChangeStack[worldStateKey];
+
+      if (!stack) {
+        continue;
+      }
 
       while (stack.length !== 0 && stack[0].effectType !== EffectType.Permanent) {
         stack.shift();
@@ -149,13 +187,21 @@ class Context {
   // The `TrimToStackDepth` method trims the `WorldStateChangeStack` array
   // to the specified depth for each element in the `stackDepth` array.
   // If the `ContextState` is `ContextState.Executing`, an error is thrown.
-  trimToStackDepth(stackDepth) {
+  trimToStackDepth(stackDepth: Record<string, number>): void {
     if (this.ContextState === ContextState.Executing) {
       throw new Error("Can not trim a context when in execution mode");
     }
 
+    if (!this.WorldStateChangeStack) {
+      return;
+    }
+
     for (const stackDepthKey of Object.keys(stackDepth)) {
       const stack = this.WorldStateChangeStack[stackDepthKey];
+
+      if (!stack) {
+        continue;
+      }
 
       while (stack.length > stackDepth[stackDepthKey]) {
         stack.pop();
@@ -163,42 +209,46 @@ class Context {
     }
   }
 
-
-  clarMTR() {
+  clearMTR(): void {
     this.MethodTraversalRecord = [];
   }
 
-  clearLastMTR() {
+  // Retained for backwards compatibility with earlier typo.
+  clarMTR(): void {
+    this.clearMTR();
+  }
+
+  clearLastMTR(): void {
     this.LastMTR = [];
   }
 
-  shiftMTR() {
+  shiftMTR(): void {
     this.LastMTR = [];
     this.LastMTR.push(...this.MethodTraversalRecord);
   }
 
-  restoreMTR() {
+  restoreMTR(): void {
     this.MethodTraversalRecord = [];
     this.MethodTraversalRecord.push(...this.LastMTR);
     this.LastMTR = [];
   }
 
-  clearLastMTRDebug() {
+  clearLastMTRDebug(): void {
     this.LastMTRDebug = [];
   }
 
-  shiftMTRDebug() {
+  shiftMTRDebug(): void {
     this.LastMTRDebug = [];
     this.LastMTRDebug.push(...this.MTRDebug);
   }
 
-  restoreMTRDebug() {
+  restoreMTRDebug(): void {
     this.MTRDebug = [];
     this.MTRDebug.push(...this.LastMTRDebug);
     this.LastMTRDebug = [];
   }
 
-  clearPartialPlanQueue() {
+  clearPartialPlanQueue(): void {
     this.PartialPlanQueue = [];
   }
 }
