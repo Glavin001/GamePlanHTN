@@ -441,9 +441,12 @@ function buildBunkerDomain(): Domain {
     .condition("Needs key", (context) => needsKey(context));
   applyMove(builder, N.TABLE);
   pickupKey(builder);
-  builder.end(); // Acquire Key sequence
+  // Acquire Key sequence
+  builder.end();
+  // Apply no-op
   applyNoOp(builder);
-  builder.end(); // Ensure Key select
+  // Ensure Key select
+  builder.end();
 
   // Ensure storage unlocked if needed
   builder.select("Ensure Storage Unlocked");
@@ -452,10 +455,13 @@ function buildBunkerDomain(): Domain {
     .condition("Needs storage access", (context) => needsStorageAccess(context))
     .condition("Door locked", (context) => !context.getBool(WS.storageUnlocked));
   applyMove(builder, N.STORAGE_DOOR);
+  // Unlock Storage sequence
   unlockStorageAction(builder);
-  builder.end(); // Unlock Storage sequence
+  builder.end();
+  // Apply no-op
   applyNoOp(builder);
-  builder.end(); // Ensure Storage Unlocked select
+  // Ensure Storage Unlocked select
+  builder.end();
 
   // Acquire C4 when necessary
   builder.select("Ensure C4");
@@ -469,10 +475,13 @@ function buildBunkerDomain(): Domain {
   builder.end();
   applyMove(builder, N.STORAGE_INT);
   applyMove(builder, N.C4_TABLE);
+  // Acquire C4 sequence
   pickupC4(builder);
-  builder.end(); // Acquire C4 sequence
+  builder.end();
+  // Apply no-op
   applyNoOp(builder);
-  builder.end(); // Ensure C4 select
+  // Ensure C4 select
+  builder.end();
 
   // Breach bunker if required
   builder.select("Ensure Bunker Breached");
@@ -489,10 +498,13 @@ function buildBunkerDomain(): Domain {
   applyNoOp(builder);
   builder.end();
   applyMove(builder, N.SAFE);
+  // Breach Bunker sequence
   detonate(builder);
-  builder.end(); // Breach Bunker sequence
+  builder.end();
+  // Apply no-op
   applyNoOp(builder);
-  builder.end(); // Ensure Bunker Breached select
+  // Ensure Bunker Breached select
+  builder.end();
 
   // Collect the star when required
   builder.select("Ensure Star");
@@ -520,7 +532,8 @@ function buildBunkerDomain(): Domain {
   applyNoOp(builder);
   builder.end();
 
-  builder.end(); // Fulfill Goals sequence
+  // Fulfill Goals sequence
+  builder.end();
 
   return builder.build();
 }
