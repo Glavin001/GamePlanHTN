@@ -1,6 +1,6 @@
 {
   "name": "htn-ai",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "description": "TypeScript Hierarchical Task Network (HTN) planner for game AI, inspired by FluidHTN",
   "type": "module",
   "source": "src/index.ts",

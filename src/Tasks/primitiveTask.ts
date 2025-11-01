@@ -55,6 +55,10 @@ class PrimitiveTask {
 
   private abortAction?: (context: Context) => void;
 
+  private utilityScore?: (context: Context) => number;
+
+  private goapCost?: (context: Context) => number;
+
   constructor(props: PrimitiveTaskProps) {
     // Process the operation, which can be either a raw function or an object containing an
     // operator field
@@ -156,6 +160,34 @@ class PrimitiveTask {
     }
 
     return this;
+  }
+
+  setUtilityScore(score?: (context: Context) => number): this {
+    this.utilityScore = score;
+
+    return this;
+  }
+
+  getUtilityScore(context: Context): number {
+    if (typeof this.utilityScore === "function") {
+      return this.utilityScore(context);
+    }
+
+    return 0;
+  }
+
+  setGoapCost(cost?: (context: Context) => number): this {
+    this.goapCost = cost;
+
+    return this;
+  }
+
+  getGoapCost(context: Context): number {
+    if (typeof this.goapCost === "function") {
+      return this.goapCost(context);
+    }
+
+    return 1;
   }
 
   stop(context?: Context | null): void {

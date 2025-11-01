@@ -84,7 +84,7 @@ const onDecomposeCompoundTask = (context: Context, childTask: CompoundTask, task
 
   return {
     plan,
-    status: plan.length === 0 ? DecompositionStatus.Failed : DecompositionStatus.Succeeded,
+    status: childResult.status,
   };
 };
 
@@ -119,7 +119,7 @@ const onDecomposeTask = (context: Context, childTask: CompoundTaskChild, taskInd
 
   const result: PlanResult = {
     plan,
-    status: plan.length === 0 ? DecompositionStatus.Failed : DecompositionStatus.Succeeded,
+    status: DecompositionStatus.Succeeded,
   };
 
   if (context.LogDecomposition) {

@@ -215,6 +215,59 @@ HTN-AI implements FluidHTN's slot system for runtime plan splicing. Slots can be
 
 The library also includes `FuncCondition` and `FuncOperator` adapters so you can reuse existing functions or lambdas while preserving context validation and type inference. Refer to the `tests/` folder for comprehensive examples that mirror the FluidHTN C# suite.
 
+### Utility & GOAP Extensions
+
+HTN-AI ships opt-in helpers inspired by the Fluid HTN extension pack:
+
+#### Utility selectors
+
+- Attach utility scores with `.utility(scoreFn)` on any child in the builder, or create primitives with `.utilityAction(name, scoreFn)`.
+- Scores can inspect arbitrary context, and invalid children are skipped automatically.
+- When multiple valid children share the same score, the selector keeps declaration order, giving deterministic behaviour.
+
+```ts
+DomainBuilder.begin("Gathering")
+  .utilitySelect("Pick Source")
+    .utilityAction("Scrap Heap", (ctx) => ctx.getState("ScrapNearby") ? 5 : 1)
+      .do(() => TaskStatus.Success)
+    .end()
+    .sequence("Mine Vein")
+      .utility((ctx) => ctx.getState("PickaxeLevel"))
+      .action("WalkToVein").do(...).end()
+      .action("MineVein").do(...).end()
+    .end()
+  .end()
+  .end();
+```
+
+#### GOAP sequences
+
+- Declare a goal with `.goapSequence(name, { StateKey: desiredValue })`.
+- Each child is a primitive `.goapAction(name, costFn?)`. Omit the second argument for the default cost of `1`, or supply a function returning a numeric cost.
+- Costs accumulate across the plan; the planner always returns the lowest-cost valid path while avoiding world-state cycles.
+- If the goal is already satisfied, the sequence succeeds with an empty plan (no-op).
+
+```ts
+DomainBuilder.begin("Heist")
+  .goapSequence("CrackSafe", { HasLoot: 1 })
+    .goapAction("PickLock", () => 2)
+      .condition("Has Lockpick", (ctx) => ctx.hasState("Lockpick"))
+      .effect("DoorOpen", EffectType.PlanOnly, (ctx, type) => ctx.setState("DoorOpen", 1, false, type))
+    .end()
+    .goapAction("BlowDoor", () => 10)
+      .condition("Has Explosives", (ctx) => ctx.hasState("Explosives"))
+      .effect("DoorOpen", EffectType.PlanOnly, (ctx, type) => ctx.setState("DoorOpen", 1, false, type))
+    .end()
+    .goapAction("GrabLoot")
+      .condition("DoorOpen", (ctx) => ctx.hasState("DoorOpen"))
+      .effect("HasLoot", EffectType.PlanOnly, (ctx, type) => ctx.setState("HasLoot", 1, false, type))
+    .end()
+  .end()
+  .end();
+```
+
+Both features remain opt-in—existing domains continue to work unchanged. See `tests/utilitySelector.ts` and `tests/goapSequence.ts` for exhaustive coverage of scoring, tie-breaking, cycle avoidance, deterministic path selection, irrelevant-action pruning, and immediate-goal success scenarios.
+
 ## Development
 
 ```bash

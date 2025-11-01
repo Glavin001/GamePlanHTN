@@ -6,10 +6,12 @@ import type { TaskCondition, PrimitiveTaskOperator, PrimitiveTaskProps } from ".
 import PrimitiveTask from "./primitiveTask";
 import * as SelectorTask from "./selectorTask";
 import * as SequenceTask from "./sequenceTask";
+import * as UtilitySelectorTask from "./utilitySelectorTask";
+import * as GoapSequenceTask from "./goapSequenceTask";
 import PausePlanTask from "./pausePlanTask";
 import Slot from "./slot";
 
-export type CompoundTaskType = "sequence" | "select";
+export type CompoundTaskType = "sequence" | "select" | "utility_select" | "goap_sequence";
 
 export type CompoundTaskChild = CompoundTask | PrimitiveTask | PausePlanTask | Slot;
 
@@ -18,6 +20,7 @@ export interface CompoundTaskConfig {
   tasks?: Array<CompoundTaskChild | PrimitiveTaskProps | PrimitiveTaskOperator | CompoundTaskConfig>;
   type: CompoundTaskType;
   conditions?: TaskCondition[];
+  goal?: Record<string, number>;
 }
 
 type ValidityTest = (context: Context, task: CompoundTask) => boolean;
@@ -39,7 +42,11 @@ class CompoundTask {
 
   private decomposeHandler: DecomposeHandler;
 
-  constructor({ name, tasks, type, conditions }: CompoundTaskConfig) {
+  private utilityScore?: (context: Context) => number;
+
+  public Goal?: Record<string, number>;
+
+  constructor({ name, tasks, type, conditions, goal }: CompoundTaskConfig) {
     this.Name = name;
     this.Type = type;
     this.validityTest = this.defaultValidityTest.bind(this);
@@ -60,6 +67,13 @@ class CompoundTask {
     } else if (type === "select") {
       this.validityTest = SelectorTask.isValid;
       this.decomposeHandler = SelectorTask.decompose;
+    } else if (type === "utility_select") {
+      this.validityTest = UtilitySelectorTask.isValid;
+      this.decomposeHandler = UtilitySelectorTask.decompose;
+    } else if (type === "goap_sequence") {
+      this.validityTest = GoapSequenceTask.isValid;
+      this.decomposeHandler = GoapSequenceTask.decompose;
+      this.Goal = goal ? { ...goal } : undefined;
     }
     // TODO: This would be a point to allow for extensibility to allow folks to provide
     // their own 'isValid' function
@@ -135,6 +149,20 @@ class CompoundTask {
     this.Conditions.push(condition);
 
     return this;
+  }
+
+  setUtilityScore(score?: (context: Context) => number): this {
+    this.utilityScore = score;
+
+    return this;
+  }
+
+  getUtilityScore(context: Context): number {
+    if (typeof this.utilityScore === "function") {
+      return this.utilityScore(context);
+    }
+
+    return 0;
   }
 }
 

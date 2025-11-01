@@ -55,6 +55,14 @@ class DomainBuilder<TContext extends Context = Context> {
     return this.addCompoundTask(new CompoundTask({ name, type: "sequence" }));
   }
 
+  utilitySelect(name: string): this {
+    return this.addCompoundTask(new CompoundTask({ name, type: "utility_select" }));
+  }
+
+  goapSequence(name: string, goal: Record<string, number>): this {
+    return this.addCompoundTask(new CompoundTask({ name, type: "goap_sequence", goal }));
+  }
+
   compoundTask(task: CompoundTask): this {
     return this.addCompoundTask(task);
   }
@@ -72,6 +80,41 @@ class DomainBuilder<TContext extends Context = Context> {
     const task = new PrimitiveTask({ name });
     this.domain.add(parent, task);
     this.pointers.push(task);
+
+    return this;
+  }
+
+  utility(score: (context: TContext) => number): this {
+    const pointer = this.pointer;
+
+    if (pointer instanceof PrimitiveTask) {
+      pointer.setUtilityScore(score as unknown as (context: Context) => number);
+    } else if (pointer instanceof CompoundTask) {
+      pointer.setUtilityScore(score as unknown as (context: Context) => number);
+    } else {
+      throw new Error("Utility scores can only be assigned to tasks");
+    }
+
+    return this;
+  }
+
+  utilityAction(name: string, score: (context: TContext) => number): this {
+    return this.action(name).utility(score);
+  }
+
+  goapAction(name: string, costFn?: (context: TContext) => number): this {
+    this.action(name);
+
+    if (typeof costFn === "function") {
+      this.cost(costFn);
+    }
+
+    return this;
+  }
+
+  cost(costFn: (context: TContext) => number): this {
+    const primitive = this.ensurePrimitivePointer();
+    primitive.setGoapCost(costFn as unknown as (context: Context) => number);
 
     return this;
   }
