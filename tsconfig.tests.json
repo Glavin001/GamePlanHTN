@@ -3,7 +3,8 @@
   "compilerOptions": {
     "module": "ESNext",
     "types": ["node"],
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "rootDir": "."
   },
   "include": ["tests/**/*.ts", "src/**/*.ts", "tsup.config.ts"],
   "exclude": []
