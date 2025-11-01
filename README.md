@@ -70,7 +70,7 @@ const domain = DomainBuilder.begin("Example")
     done.primitive("Done", (task) =>
       task.do({
         execute: (context) => {
-          context.Done = true;
+          context.setState("Done", true, false);
           return TaskStatus.Continue;
         },
       }),
@@ -159,7 +159,7 @@ const domain = new Domain({
           name: "Done",
           operator: (context) => {
             log.info("Done");
-            context.Done = true;
+            context.setState("Done", true, false);
             return TaskStatus.Continue;
           },
         },
@@ -184,6 +184,7 @@ context.WorldState = {
   HasA: 0,
   HasB: 0,
   HasC: 0,
+  Done: false,
 };
 
 context.init();
@@ -204,9 +205,17 @@ context.WorldState = {
 let planner = new Planner();
 context.init();
 
-while (!context.Done) {
+while (!context.hasState("Done")) {
     planner.tick(domain, context);
 }
+```
+
+If you need to check or mutate the done flag programmatically, prefer the typed accessors:
+
+```js
+context.setState("Done", true, false);
+const isDone = context.getState("Done") === true;
+```
 ```
 
 ### Slots and Functional Helpers

@@ -1,5 +1,6 @@
 import Domain from "./domain";
 import type Context from "./context";
+import type { WorldStateBase } from "./context";
 import { type EffectTypeValue } from "./effectType";
 import CompoundTask, { type CompoundTaskChild } from "./Tasks/compoundTask";
 import PrimitiveTask, { type PrimitiveTaskOperator, type TaskCondition } from "./Tasks/primitiveTask";
@@ -7,19 +8,19 @@ import PausePlanTask from "./Tasks/pausePlanTask";
 import Slot from "./Tasks/slot";
 import Effect from "./effect";
 
-type Pointer = CompoundTask | PrimitiveTask;
+type Pointer<TContext extends Context<WorldStateBase>> = CompoundTask<TContext> | PrimitiveTask<TContext>;
 
-class DomainBuilder<TContext extends Context = Context> {
-  private readonly domain: Domain;
+class DomainBuilder<TContext extends Context<WorldStateBase> = Context> {
+  private readonly domain: Domain<TContext>;
 
-  private pointers: Pointer[];
+  private pointers: Pointer<TContext>[];
 
   constructor(name: string) {
-    this.domain = new Domain({ name });
+    this.domain = new Domain<TContext>({ name });
     this.pointers = [this.domain.Root];
   }
 
-  get pointer(): Pointer {
+  get pointer(): Pointer<TContext> {
     if (this.pointers.length === 0) {
       throw new Error("The domain has already been built and the builder can no longer be used.");
     }
@@ -27,7 +28,7 @@ class DomainBuilder<TContext extends Context = Context> {
     return this.pointers[this.pointers.length - 1];
   }
 
-  build(): Domain {
+  build(): Domain<TContext> {
     if (this.pointer !== this.domain.Root) {
       throw new Error(`The domain definition lacks one or more end() calls. Pointer is '${this.pointer.Name}', expected '${this.domain.Root.Name}'.`);
     }
@@ -48,26 +49,26 @@ class DomainBuilder<TContext extends Context = Context> {
   }
 
   select(name: string): this {
-    return this.addCompoundTask(new CompoundTask({ name, type: "select" }));
+    return this.addCompoundTask(new CompoundTask<TContext>({ name, type: "select" }));
   }
 
   sequence(name: string): this {
-    return this.addCompoundTask(new CompoundTask({ name, type: "sequence" }));
+    return this.addCompoundTask(new CompoundTask<TContext>({ name, type: "sequence" }));
   }
 
   utilitySelect(name: string): this {
-    return this.addCompoundTask(new CompoundTask({ name, type: "utility_select" }));
+    return this.addCompoundTask(new CompoundTask<TContext>({ name, type: "utility_select" }));
   }
 
   goapSequence(name: string, goal: Record<string, number>): this {
-    return this.addCompoundTask(new CompoundTask({ name, type: "goap_sequence", goal }));
+    return this.addCompoundTask(new CompoundTask<TContext>({ name, type: "goap_sequence", goal }));
   }
 
-  compoundTask(task: CompoundTask): this {
+  compoundTask(task: CompoundTask<TContext>): this {
     return this.addCompoundTask(task);
   }
 
-  primitiveTask(task: PrimitiveTask): this {
+  primitiveTask(task: PrimitiveTask<TContext>): this {
     const parent = this.ensureCompoundPointer();
     this.domain.add(parent, task);
     this.pointers.push(task);
@@ -77,7 +78,7 @@ class DomainBuilder<TContext extends Context = Context> {
 
   action(name: string): this {
     const parent = this.ensureCompoundPointer();
-    const task = new PrimitiveTask({ name });
+    const task = new PrimitiveTask<TContext>({ name });
     this.domain.add(parent, task);
     this.pointers.push(task);
 
@@ -88,9 +89,9 @@ class DomainBuilder<TContext extends Context = Context> {
     const pointer = this.pointer;
 
     if (pointer instanceof PrimitiveTask) {
-      pointer.setUtilityScore(score as unknown as (context: Context) => number);
+      pointer.setUtilityScore(score);
     } else if (pointer instanceof CompoundTask) {
-      pointer.setUtilityScore(score as unknown as (context: Context) => number);
+      pointer.setUtilityScore(score);
     } else {
       throw new Error("Utility scores can only be assigned to tasks");
     }
@@ -116,9 +117,9 @@ class DomainBuilder<TContext extends Context = Context> {
     const pointer = this.pointer;
 
     if (pointer instanceof PrimitiveTask) {
-      pointer.setGoapCost(costFn as unknown as (context: Context) => number);
+      pointer.setGoapCost(costFn);
     } else if (pointer instanceof CompoundTask) {
-      pointer.setGoapCost(costFn as unknown as (context: Context) => number);
+      pointer.setGoapCost(costFn);
     } else {
       throw new Error("Cost can only be assigned to tasks");
     }
@@ -140,30 +141,26 @@ class DomainBuilder<TContext extends Context = Context> {
   }
 
   do(
-    operator: PrimitiveTaskOperator,
+    operator: PrimitiveTaskOperator<TContext>,
     forceStopAction?: (context: TContext) => void,
     abortAction?: (context: TContext) => void,
   ): this {
     const primitive = this.ensurePrimitivePointer();
-    primitive.setOperator(
-      operator,
-      forceStopAction as unknown as (context: Context) => void,
-      abortAction as unknown as (context: Context) => void,
-    );
+    primitive.setOperator(operator, forceStopAction, abortAction);
 
     return this;
   }
 
   effect(name: string, type: EffectTypeValue, action: (context: TContext, effectType: EffectTypeValue | null) => void): this {
     const primitive = this.ensurePrimitivePointer();
-    primitive.addEffect(new Effect({ name, type, action: action as unknown as (context: Context, type: EffectTypeValue | null) => void }));
+    primitive.addEffect(new Effect<TContext>({ name, type, action }));
 
     return this;
   }
 
-  splice(domain: Domain): this {
+  splice(domain: Domain<TContext>): this {
     const parent = this.ensureCompoundPointer();
-    this.domain.add(parent, domain.Root as CompoundTaskChild);
+    this.domain.add(parent, domain.Root as CompoundTaskChild<TContext>);
 
     return this;
   }
@@ -188,7 +185,7 @@ class DomainBuilder<TContext extends Context = Context> {
     return this;
   }
 
-  private addCompoundTask(task: CompoundTask): this {
+  private addCompoundTask(task: CompoundTask<TContext>): this {
     const parent = this.ensureCompoundPointer();
     this.domain.add(parent, task);
     this.pointers.push(task);
@@ -196,7 +193,7 @@ class DomainBuilder<TContext extends Context = Context> {
     return this;
   }
 
-  private ensureCompoundPointer(): CompoundTask {
+  private ensureCompoundPointer(): CompoundTask<TContext> {
     if (!(this.pointer instanceof CompoundTask)) {
       throw new Error("Pointer is not a compound task. Did you forget to call end()?");
     }
@@ -204,7 +201,7 @@ class DomainBuilder<TContext extends Context = Context> {
     return this.pointer;
   }
 
-  private ensurePrimitivePointer(): PrimitiveTask {
+  private ensurePrimitivePointer(): PrimitiveTask<TContext> {
     if (!(this.pointer instanceof PrimitiveTask)) {
       throw new Error("Pointer is not a primitive task. Did you forget to define an action?");
     }

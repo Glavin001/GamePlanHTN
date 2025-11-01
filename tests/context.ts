@@ -97,14 +97,14 @@ test("GetWorldStateChangeDepth expected behavior", () => {
   const changeDepthExecuting = ctx.getWorldStateChangeDepth();
 
   ctx.ContextState = ContextState.Planning;
-  ctx.setState("HasB", true, EffectType.Permanent);
+  ctx.setState("HasB", 1, true, EffectType.Permanent);
   const changeDepthPlanning = ctx.getWorldStateChangeDepth();
 
-  assert.equal(Object.keys(ctx.WorldStateChangeStack).length, Object.keys(changeDepthExecuting).length);
+  assert.equal(Object.keys(ctx.WorldStateChangeStack!).length, Object.keys(changeDepthExecuting).length);
   assert.equal(changeDepthExecuting.HasA, 0);
   assert.equal(changeDepthExecuting.HasB, 0);
 
-  assert.equal(Object.keys(ctx.WorldStateChangeStack).length, Object.keys(changeDepthPlanning).length);
+  assert.equal(Object.keys(ctx.WorldStateChangeStack!).length, Object.keys(changeDepthPlanning).length);
   assert.equal(changeDepthPlanning.HasA, 0);
   assert.equal(changeDepthPlanning.HasB, 1);
 });

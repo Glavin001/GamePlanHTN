@@ -2,6 +2,7 @@ import log from "loglevel";
 import type Context from "../context";
 import DecompositionStatus from "../decompositionStatus";
 import type { PlanResult } from "../types";
+import type { EffectDefinition } from "../effect";
 import type { TaskCondition, PrimitiveTaskOperator, PrimitiveTaskProps } from "./primitiveTask";
 import PrimitiveTask from "./primitiveTask";
 import * as SelectorTask from "./selectorTask";
@@ -13,42 +14,50 @@ import Slot from "./slot";
 
 export type CompoundTaskType = "sequence" | "select" | "utility_select" | "goap_sequence";
 
-export type CompoundTaskChild = CompoundTask | PrimitiveTask | PausePlanTask | Slot;
+type AllTaskTypes<TContext extends Context> = CompoundTaskChild<TContext> | PrimitiveTaskProps<TContext> | PrimitiveTaskOperator<TContext> | CompoundTaskConfig<TContext>;
 
-export interface CompoundTaskConfig {
+export type CompoundTaskChild<TContext extends Context = Context> =
+  | CompoundTask<TContext>
+  | PrimitiveTask<TContext>
+  | PausePlanTask
+  | Slot;
+
+export interface CompoundTaskConfig<TContext extends Context = Context> {
   name: string;
-  tasks?: Array<CompoundTaskChild | PrimitiveTaskProps | PrimitiveTaskOperator | CompoundTaskConfig>;
+  tasks?: Array<AllTaskTypes<TContext>>
+    | AllTaskTypes<TContext>;
   type: CompoundTaskType;
-  conditions?: TaskCondition[];
+  conditions?: TaskCondition<TContext>[];
+  effects?: EffectDefinition<TContext>[];
   goal?: Record<string, number>;
 }
 
-type ValidityTest = (context: Context, task: CompoundTask) => boolean;
+type ValidityTest<TContext extends Context> = (context: TContext, task: CompoundTask<TContext>) => boolean;
 
-type DecomposeHandler = (context: Context, startIndex: number, task: CompoundTask) => PlanResult;
+type DecomposeHandler<TContext extends Context> = (context: TContext, startIndex: number, task: CompoundTask<TContext>) => PlanResult<TContext>;
 
-class CompoundTask {
-  public Conditions: TaskCondition[] = [];
+class CompoundTask<TContext extends Context = Context> {
+  public Conditions: TaskCondition<TContext>[] = [];
 
-  public Children: CompoundTaskChild[] = [];
+  public Children: CompoundTaskChild<TContext>[] = [];
 
   public Name: string;
 
   public Type: CompoundTaskType;
 
-  public Parent?: CompoundTask;
+  public Parent?: CompoundTask<TContext>;
 
-  private validityTest: ValidityTest;
+  private validityTest: ValidityTest<TContext>;
 
-  private decomposeHandler: DecomposeHandler;
+  private decomposeHandler: DecomposeHandler<TContext>;
 
-  private utilityScore?: (context: Context) => number;
+  private utilityScore?: (context: TContext) => number;
 
-  private goapCost?: (context: Context) => number;
+  private goapCost?: (context: TContext) => number;
 
   public Goal?: Record<string, number>;
 
-  constructor({ name, tasks, type, conditions, goal }: CompoundTaskConfig) {
+  constructor({ name, tasks, type, conditions, goal }: CompoundTaskConfig<TContext>) {
     this.Name = name;
     this.Type = type;
     this.validityTest = this.defaultValidityTest.bind(this);
@@ -64,17 +73,17 @@ class CompoundTask {
 
     // For simple HTNs, we make sequence and selector default node types and wire everything up
     if (type === "sequence") {
-      this.validityTest = SequenceTask.isValid;
-      this.decomposeHandler = SequenceTask.decompose;
+      this.validityTest = SequenceTask.isValid as ValidityTest<TContext>;
+      this.decomposeHandler = SequenceTask.decompose as DecomposeHandler<TContext>;
     } else if (type === "select") {
-      this.validityTest = SelectorTask.isValid;
-      this.decomposeHandler = SelectorTask.decompose;
+      this.validityTest = SelectorTask.isValid as ValidityTest<TContext>;
+      this.decomposeHandler = SelectorTask.decompose as DecomposeHandler<TContext>;
     } else if (type === "utility_select") {
-      this.validityTest = UtilitySelectorTask.isValid;
-      this.decomposeHandler = UtilitySelectorTask.decompose;
+      this.validityTest = UtilitySelectorTask.isValid as ValidityTest<TContext>;
+      this.decomposeHandler = UtilitySelectorTask.decompose as DecomposeHandler<TContext>;
     } else if (type === "goap_sequence") {
-      this.validityTest = GoapSequenceTask.isValid;
-      this.decomposeHandler = GoapSequenceTask.decompose;
+      this.validityTest = GoapSequenceTask.isValid as ValidityTest<TContext>;
+      this.decomposeHandler = GoapSequenceTask.decompose as DecomposeHandler<TContext>;
       this.Goal = goal ? { ...goal } : undefined;
     }
     // TODO: This would be a point to allow for extensibility to allow folks to provide
@@ -86,19 +95,19 @@ class CompoundTask {
     }
   }
 
-  private normalizeChild(child: CompoundTaskChild | PrimitiveTaskProps | PrimitiveTaskOperator | CompoundTaskConfig): CompoundTaskChild {
+  private normalizeChild(child: CompoundTaskChild<TContext> | PrimitiveTaskProps<TContext> | PrimitiveTaskOperator<TContext> | CompoundTaskConfig<TContext>): CompoundTaskChild<TContext> {
     if (child instanceof PrimitiveTask || child instanceof CompoundTask || child instanceof PausePlanTask || child instanceof Slot) {
       return child;
     }
 
     if (typeof child === "function" || (typeof child === "object" && "operator" in child)) {
-      return new PrimitiveTask(child as PrimitiveTaskProps);
+      return new PrimitiveTask<TContext>(child as PrimitiveTaskProps<TContext>);
     }
 
-    return new CompoundTask(child as CompoundTaskConfig);
+    return new CompoundTask<TContext>(child as CompoundTaskConfig<TContext>);
   }
 
-  private defaultDecomposeHandler(_context: Context, _startIndex: number, task: CompoundTask = this): PlanResult {
+  private defaultDecomposeHandler(_context: TContext, _startIndex: number, task: CompoundTask<TContext> = this): PlanResult<TContext> {
     log.warn(`Compound task of ${task.Type} type (no decompose method) was decomposed! Task: ${task.Name}`);
 
     return { plan: [], status: DecompositionStatus.Rejected };
@@ -118,11 +127,11 @@ class CompoundTask {
     return json;
   }
 
-  isValid(context: Context): boolean {
+  isValid(context: TContext): boolean {
     return this.validityTest(context, this);
   }
 
-  defaultValidityTest(context: Context, task: CompoundTask = this): boolean {
+  defaultValidityTest(context: TContext, task: CompoundTask<TContext> = this): boolean {
     // Evaluate every condition for this task
     // If any return false, the condition for this task is not valid
     for (let index = 0; index < task.Conditions.length; index++) {
@@ -137,29 +146,29 @@ class CompoundTask {
     return true;
   }
 
-  decompose(context: Context, startIndex: number): PlanResult {
+  decompose(context: TContext, startIndex: number): PlanResult<TContext> {
     return this.decomposeHandler(context, startIndex, this);
   }
 
-  addSubtask(subtask: CompoundTaskChild): this {
+  addSubtask(subtask: CompoundTaskChild<TContext>): this {
     this.Children.push(subtask);
 
     return this;
   }
 
-  addCondition(condition: TaskCondition): this {
+  addCondition(condition: TaskCondition<TContext>): this {
     this.Conditions.push(condition);
 
     return this;
   }
 
-  setUtilityScore(score?: (context: Context) => number): this {
+  setUtilityScore(score?: (context: TContext) => number): this {
     this.utilityScore = score;
 
     return this;
   }
 
-  getUtilityScore(context: Context): number {
+  getUtilityScore(context: TContext): number {
     if (typeof this.utilityScore === "function") {
       return this.utilityScore(context);
     }
@@ -167,13 +176,13 @@ class CompoundTask {
     return 0;
   }
 
-  setGoapCost(cost?: (context: Context) => number): this {
+  setGoapCost(cost?: (context: TContext) => number): this {
     this.goapCost = cost;
 
     return this;
   }
 
-  getGoapCost(context: Context): number {
+  getGoapCost(context: TContext): number {
     if (typeof this.goapCost === "function") {
       return this.goapCost(context);
     }

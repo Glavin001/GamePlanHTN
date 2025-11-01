@@ -2,7 +2,7 @@
 import { test } from "uvu";
 import * as assert from "uvu/assert";
 import log from "loglevel";
-import Domain from "../src/domain";
+import Domain, { type DomainOptions } from "../src/domain";
 import TaskStatus from "../src/taskStatus";
 import DecompositionStatus from "../src/decompositionStatus";
 import * as TestUtil from "./utils";
@@ -10,10 +10,11 @@ import ContextState from "../src/contextState";
 import EffectType from "../src/effectType";
 import PausePlanTask from "../src/Tasks/pausePlanTask";
 import FuncCondition from "../src/conditions/funcCondition";
+import type { TestContext } from "./utils";
 
 log.enableAll();
 
-const example1 = {
+const example1: DomainOptions<TestContext> = {
   name: "Test",
   tasks: [
     {
@@ -28,7 +29,7 @@ const example1 = {
             // Has NOT C
             (context) => !context.hasState("HasC"),
           ],
-          operator: () => {
+          operator: (_context) => {
             log.info("Get C");
 
             return TaskStatus.Success;
@@ -52,7 +53,7 @@ const example1 = {
           ],
           operator:
             // Get A
-            () => {
+            (_context) => {
               log.info("Get A");
 
               return TaskStatus.Success;
@@ -65,7 +66,7 @@ const example1 = {
           name: "Get B (Primitive Task)",
           operator:
             // Get A
-            () => {
+            (_context) => {
               log.info("Get B");
 
               return TaskStatus.Success;
@@ -176,21 +177,21 @@ let example2 = {
 
 
 test("Create a Domain successfully", () => {
-  new Domain(example1);
+  new Domain<TestContext>(example1);
 });
 
 test("Name and Root are added to domains", () => {
-  const domain = new Domain(example1);
+  const domain = new Domain<TestContext>(example1);
 
   assert.ok(domain.Root);
   assert.equal(domain.Name, "Test");
 });
 
 test("Add Subtask to domain expected behavior", () => {
-  const domain = new Domain({});
+  const domain = new Domain<TestContext>({});
 
-  const task1 = TestUtil.getEmptyCompoundTask();
-  const task2 = TestUtil.getSimplePrimitiveTask("foo");
+  const task1 = TestUtil.getEmptyCompoundTask<TestContext>();
+  const task2 = TestUtil.getSimplePrimitiveTask<TestContext>("foo");
 
   domain.add(task1, task2);
   assert.ok(task1.Children.includes(task2));
@@ -198,7 +199,7 @@ test("Add Subtask to domain expected behavior", () => {
 });
 
 test("Planning throws without a context", () => {
-  const domain = new Domain({});
+  const domain = new Domain<TestContext>({});
 
   assert.throws(() => {
     domain.findPlan(null);
@@ -207,7 +208,7 @@ test("Planning throws without a context", () => {
 
 test("Planning throws with an uninitialized context", () => {
   const ctx = TestUtil.getEmptyTestContext();
-  const domain = new Domain({});
+  const domain = new Domain<TestContext>({});
 
   assert.throws(() => {
     domain.findPlan(ctx);
@@ -220,7 +221,7 @@ test("Planning returns null if there are no tasks", () => {
 
   ctx.init();
 
-  const domain = new Domain({ name: "Test" });
+  const domain = new Domain<TestContext>({ name: "Test" });
   const planResult = domain.findPlan(ctx);
 
   assert.equal(planResult.status, DecompositionStatus.Rejected);
@@ -233,7 +234,7 @@ test("MTR Null throws exception", () => {
   ctx.init();
   ctx.MethodTraversalRecord = null;
 
-  const domain = new Domain({ name: "Test" });
+  const domain = new Domain<TestContext>({ name: "Test" });
 
   assert.throws(() => {
     domain.findPlan(ctx);
@@ -245,7 +246,7 @@ test("Planning leaves context in Executing state", () => {
 
   ctx.init();
 
-  const domain = TestUtil.getEmptyTestDomain();
+  const domain = TestUtil.getEmptyTestDomain<TestContext>();
 
   domain.findPlan(ctx);
   assert.equal(ctx.ContextState, ContextState.Executing);
@@ -256,9 +257,9 @@ test("findPlan expected behavior", () => {
 
   ctx.init();
 
-  const domain = TestUtil.getEmptyTestDomain();
-  const task1 = TestUtil.getEmptySelectorTask("Test");
-  const task2 = TestUtil.getSimplePrimitiveTask("Sub-task");
+  const domain = TestUtil.getEmptyTestDomain<TestContext>();
+  const task1 = TestUtil.getEmptySelectorTask<TestContext>("Test");
+  const task2 = TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task");
 
   domain.add(domain.Root, task1);
   domain.add(task1, task2);
@@ -276,21 +277,21 @@ test("findPlan trims non permanent state changes", () => {
 
   ctx.init();
 
-  const domain = TestUtil.getEmptyTestDomain();
-  const task1 = TestUtil.getEmptySequenceTask("Test");
-  const task2 = TestUtil.getSimplePrimitiveTask("Sub-task1");
+  const domain = TestUtil.getEmptyTestDomain<TestContext>();
+  const task1 = TestUtil.getEmptySequenceTask<TestContext>("Test");
+  const task2 = TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task1");
 
   task2.Effects.push(TestUtil.getSimpleEffect("TestEffect1",
     EffectType.PlanOnly,
     "HasA"));
 
-  const task3 = TestUtil.getSimplePrimitiveTask("Sub-task2");
+  const task3 = TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2");
 
   task3.Effects.push(TestUtil.getSimpleEffect("TestEffect2",
     EffectType.PlanAndExecute,
     "HasB"));
 
-  const task4 = TestUtil.getSimplePrimitiveTask("Sub-task3");
+  const task4 = TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task3");
 
   task4.Effects.push(TestUtil.getSimpleEffect("TestEffect3",
     EffectType.Permanent,
@@ -318,18 +319,18 @@ test("findPlan clears state change when plan is empty", () => {
   const ctx = TestUtil.getEmptyTestContext();
 
   ctx.init();
-  const domain = TestUtil.getEmptyTestDomain();
-  const task1 = TestUtil.getEmptySequenceTask("Test");
-  const task2 = TestUtil.getSimplePrimitiveTask("Sub-task1");
-  const task3 = TestUtil.getSimplePrimitiveTask("Sub-task2");
-  const task4 = TestUtil.getSimplePrimitiveTask("Sub-task3");
-  const task5 = TestUtil.getSimplePrimitiveTask("Sub-task4");
+  const domain = TestUtil.getEmptyTestDomain<typeof ctx>();
+  const task1 = TestUtil.getEmptySequenceTask<TestContext>("Test");
+  const task2 = TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task1");
+  const task3 = TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2");
+  const task4 = TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task3");
+  const task5 = TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task4");
 
   task2.Effects.push(TestUtil.getSimpleEffect("TestEffect1", EffectType.PlanOnly, "HasA"));
   task3.Effects.push(TestUtil.getSimpleEffect("TestEffect2", EffectType.PlanAndExecute, "HasB"));
   task4.Effects.push(TestUtil.getSimpleEffect("TestEffect3", EffectType.Permanent, "HasC"));
 
-  task5.Conditions.push((context) => context.Done === true);
+  task5.Conditions.push((context) => context.hasState("Done"));
 
   domain.add(domain.Root, task1);
   domain.add(task1, task2);
@@ -360,12 +361,12 @@ test("findPlan if MTRs are equal then return empty plan", () => {
   // Root is a Selector that branches into task1 sequence or task2 selector.
   // With selectors tracking both compound nodes and the winning primitive child,
   // the recorded MTR has two entries when a plan is found.
-  const domain = TestUtil.getEmptyTestDomain();
-  const task1 = TestUtil.getEmptySequenceTask("Test1");
-  const task2 = TestUtil.getEmptySelectorTask("Test2");
-  const task3 = TestUtil.getSimplePrimitiveTask("Sub-task1").addCondition((context) => context.Done === true);
-  const task4 = TestUtil.getSimplePrimitiveTask("Sub-task1");
-  const task5 = TestUtil.getSimplePrimitiveTask("Sub-task2").addCondition((context) => context.Done === true);
+  const domain = TestUtil.getEmptyTestDomain<TestContext>();
+  const task1 = TestUtil.getEmptySequenceTask<TestContext>("Test1");
+  const task2 = TestUtil.getEmptySelectorTask<TestContext>("Test2");
+  const task3 = TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task1").addCondition((context) => context.hasState("Done"));
+  const task4 = TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task1");
+  const task5 = TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2").addCondition((context) => context.hasState("Done"));
 
   domain.add(domain.Root, task1);
   domain.add(domain.Root, task2);
@@ -388,12 +389,12 @@ test("findPlan selects better primary task when MTR improves", () => {
   ctx.LastMTR.push(0);
   ctx.LastMTR.push(1);
 
-  const domain = TestUtil.getEmptyTestDomain();
-  const selector = TestUtil.getEmptySelectorTask("Select");
-  const actionA = TestUtil.getSimplePrimitiveTask("Action A")
-    .addCondition(new FuncCondition("Can choose A", (context) => context.Done === true));
-  const actionB = TestUtil.getSimplePrimitiveTask("Action B")
-    .addCondition(new FuncCondition("Can choose B", (context) => context.Done === false));
+  const domain = TestUtil.getEmptyTestDomain<TestContext>();
+  const selector = TestUtil.getEmptySelectorTask<TestContext>("Select");
+  const actionA = TestUtil.getSimplePrimitiveTask<TestContext>("Action A")
+    .addCondition(new FuncCondition("Can choose A", (context) => context.hasState("Done")));
+  const actionB = TestUtil.getSimplePrimitiveTask<TestContext>("Action B")
+    .addCondition(new FuncCondition("Can choose B", (context) => !context.hasState("Done")));
 
   domain.add(domain.Root, selector);
   domain.add(selector, actionA);
@@ -407,7 +408,7 @@ test("findPlan selects better primary task when MTR improves", () => {
   assert.is(ctx.MethodTraversalRecord[0], ctx.LastMTR[0]);
   assert.is(ctx.MethodTraversalRecord[1], ctx.LastMTR[1]);
 
-  ctx.Done = true;
+  ctx.setState("Done", true, false);
   ctx.IsDirty = true;
 
   ({ status, plan } = domain.findPlan(ctx));
@@ -426,13 +427,13 @@ test("Pause Plan expected behavior", () => {
   const ctx = TestUtil.getEmptyTestContext();
 
   ctx.init();
-  const domain = TestUtil.getEmptyTestDomain();
-  const task = TestUtil.getEmptySequenceTask("Test");
+  const domain = TestUtil.getEmptyTestDomain<TestContext>();
+  const task = TestUtil.getEmptySequenceTask<TestContext>("Test");
 
   domain.add(domain.Root, task);
-  domain.add(task, TestUtil.getSimplePrimitiveTask("Sub-task1"));
+  domain.add(task, TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task1"));
   domain.add(task, new PausePlanTask());
-  domain.add(task, TestUtil.getSimplePrimitiveTask("Sub-task2"));
+  domain.add(task, TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2"));
 
   const { status, plan } = domain.findPlan(ctx);
 
@@ -451,13 +452,13 @@ test("Continue Paused Plan expected behavior", () => {
 
   ctx.init();
 
-  const domain = TestUtil.getEmptyTestDomain();
-  const task = TestUtil.getEmptySequenceTask("Test");
+  const domain = TestUtil.getEmptyTestDomain<TestContext>();
+  const task = TestUtil.getEmptySequenceTask<TestContext>("Test");
 
   domain.add(domain.Root, task);
-  domain.add(task, TestUtil.getSimplePrimitiveTask("Sub-task1"));
+  domain.add(task, TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task1"));
   domain.add(task, new PausePlanTask());
-  domain.add(task, TestUtil.getSimplePrimitiveTask("Sub-task2"));
+  domain.add(task, TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2"));
 
   let { status, plan } = domain.findPlan(ctx);
 
@@ -483,21 +484,21 @@ test("Nested Pause Plan Expected behavior", () => {
 
   ctx.init();
 
-  const domain = TestUtil.getEmptyTestDomain();
-  const task = TestUtil.getEmptySequenceTask("Test");
-  const task2 = TestUtil.getEmptySelectorTask("Test2");
-  const task3 = TestUtil.getEmptySequenceTask("Test3");
+  const domain = TestUtil.getEmptyTestDomain<TestContext>();
+  const task = TestUtil.getEmptySequenceTask<TestContext>("Test");
+  const task2 = TestUtil.getEmptySelectorTask<TestContext>("Test2");
+  const task3 = TestUtil.getEmptySequenceTask<TestContext>("Test3");
 
   domain.add(domain.Root, task);
   domain.add(task, task2);
-  domain.add(task, TestUtil.getSimplePrimitiveTask("Sub-task4"));
+  domain.add(task, TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task4"));
 
   domain.add(task2, task3);
-  domain.add(task2, TestUtil.getSimplePrimitiveTask("Sub-task3"));
+  domain.add(task2, TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task3"));
 
-  domain.add(task3, TestUtil.getSimplePrimitiveTask("Sub-task1"));
+  domain.add(task3, TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task1"));
   domain.add(task3, new PausePlanTask());
-  domain.add(task3, TestUtil.getSimplePrimitiveTask("Sub-task2"));
+  domain.add(task3, TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2"));
 
   const { status, plan } = domain.findPlan(ctx);
 
@@ -522,20 +523,20 @@ test("Continue nested pause plan expected behavior", () => {
   ctx.init();
   const domain = TestUtil.getEmptyTestDomain();
 
-  const task = TestUtil.getEmptySequenceTask("Test");
-  const task2 = TestUtil.getEmptySelectorTask("Test2");
-  const task3 = TestUtil.getEmptySequenceTask("Test3");
+  const task = TestUtil.getEmptySequenceTask<TestContext>("Test");
+  const task2 = TestUtil.getEmptySelectorTask<TestContext>("Test2");
+  const task3 = TestUtil.getEmptySequenceTask<TestContext>("Test3");
 
   domain.add(domain.Root, task);
   domain.add(task, task2);
-  domain.add(task, TestUtil.getSimplePrimitiveTask("Sub-task4"));
+  domain.add(task, TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task4"));
 
   domain.add(task2, task3);
-  domain.add(task2, TestUtil.getSimplePrimitiveTask("Sub-task3"));
+  domain.add(task2, TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task3"));
 
-  domain.add(task3, TestUtil.getSimplePrimitiveTask("Sub-task1"));
+  domain.add(task3, TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task1"));
   domain.add(task3, new PausePlanTask());
-  domain.add(task3, TestUtil.getSimplePrimitiveTask("Sub-task2"));
+  domain.add(task3, TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2"));
 
   let { status, plan } = domain.findPlan(ctx);
 
@@ -567,28 +568,28 @@ test("Continue multiple nested pause plan expected behavior", () => {
   ctx.init();
   const domain = TestUtil.getEmptyTestDomain();
 
-  const task = TestUtil.getEmptySequenceTask("Test");
-  const task2 = TestUtil.getEmptySelectorTask("Test2");
-  const task3 = TestUtil.getEmptySequenceTask("Test3");
-  const task4 = TestUtil.getEmptySequenceTask("Test4");
+  const task = TestUtil.getEmptySequenceTask<TestContext>("Test");
+  const task2 = TestUtil.getEmptySelectorTask<TestContext>("Test2");
+  const task3 = TestUtil.getEmptySequenceTask<TestContext>("Test3");
+  const task4 = TestUtil.getEmptySequenceTask<TestContext>("Test4");
 
   domain.add(domain.Root, task);
 
-  domain.add(task3, TestUtil.getSimplePrimitiveTask("Sub-task1"));
+  domain.add(task3, TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task1"));
   domain.add(task3, new PausePlanTask());
-  domain.add(task3, TestUtil.getSimplePrimitiveTask("Sub-task2"));
+  domain.add(task3, TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2"));
 
   domain.add(task2, task3);
-  domain.add(task2, TestUtil.getSimplePrimitiveTask("Sub-task3"));
+  domain.add(task2, TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task3"));
 
-  domain.add(task4, TestUtil.getSimplePrimitiveTask("Sub-task5"));
+  domain.add(task4, TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task5"));
   domain.add(task4, new PausePlanTask());
-  domain.add(task4, TestUtil.getSimplePrimitiveTask("Sub-task6"));
+  domain.add(task4, TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task6"));
 
   domain.add(task, task2);
-  domain.add(task, TestUtil.getSimplePrimitiveTask("Sub-task4"));
+  domain.add(task, TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task4"));
   domain.add(task, task4);
-  domain.add(task, TestUtil.getSimplePrimitiveTask("Sub-task7"));
+  domain.add(task, TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task7"));
 
   let { status, plan } = domain.findPlan(ctx);
 

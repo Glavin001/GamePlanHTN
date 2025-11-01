@@ -245,7 +245,7 @@ class BunkerContext extends Context {
   }
 
   getAgentNode(): NodeId {
-    const idx = this.getState(WS.agentAt);
+    const idx = this.getState(WS.agentAt) as number;
     return INDEX_TO_NODE[idx] ?? N.COURTYARD;
   }
 

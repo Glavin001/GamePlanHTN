@@ -1,24 +1,24 @@
-import Context from "./context";
+import Context, { type WorldStateBase } from "./context";
 import type { EffectTypeValue } from "./effectType";
 
-export type EffectAction = (context: Context, type: EffectTypeValue | null) => void;
+export type EffectAction<TContext extends Context<WorldStateBase> = Context> = (context: TContext, type: EffectTypeValue | null) => void;
 
-export interface EffectConfig {
+export interface EffectConfig<TContext extends Context<WorldStateBase> = Context> {
   name: string;
   type: EffectTypeValue;
-  action: EffectAction;
+  action: EffectAction<TContext>;
 }
 
-export type EffectDefinition = EffectConfig | EffectAction;
+export type EffectDefinition<TContext extends Context<WorldStateBase> = Context> = EffectConfig<TContext> | EffectAction<TContext>;
 
-class Effect {
+class Effect<TContext extends Context<WorldStateBase> = Context> {
   public readonly Type: EffectTypeValue | null;
 
   public readonly Name: string;
 
-  public readonly _effectFunction: EffectAction;
+  public readonly _effectFunction: EffectAction<TContext>;
 
-  constructor(props: EffectDefinition) {
+  constructor(props: EffectDefinition<TContext>) {
     if (typeof props === "function") {
       this._effectFunction = props;
       this.Type = null;
@@ -36,7 +36,7 @@ class Effect {
     }
 
     if (typeof this._effectFunction === "function") {
-      this._effectFunction(context, this.Type);
+      this._effectFunction(context as TContext, this.Type);
     }
   }
 }

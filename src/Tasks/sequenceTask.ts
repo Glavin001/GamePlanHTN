@@ -1,12 +1,13 @@
 import log from "loglevel";
 import type Context from "../context";
+import type { WorldStateBase } from "../context";
 import DecompositionStatus from "../decompositionStatus";
 import type { PlanResult } from "../types";
 import CompoundTask, { type CompoundTaskChild } from "./compoundTask";
 import PrimitiveTask from "./primitiveTask";
 import PausePlanTask from "./pausePlanTask";
 
-const isValid = (context: Context, task: CompoundTask): boolean => {
+const isValid = <TContext extends Context<WorldStateBase>>(context: TContext, task: CompoundTask<TContext>): boolean => {
   if (task.defaultValidityTest(context, task) === false) {
     return false;
   }
@@ -20,14 +21,14 @@ const isValid = (context: Context, task: CompoundTask): boolean => {
 };
 
 // TODO: Fix this (function currently exceeds max-params just like FluidHTN)
-const onDecomposeCompoundTask = (
-  context: Context,
-  childTask: CompoundTask,
+const onDecomposeCompoundTask = <TContext extends Context<WorldStateBase>>(
+  context: TContext,
+  childTask: CompoundTask<TContext>,
   taskIndex: number,
   oldStackDepth: Record<string, number>,
-  plan: PrimitiveTask[],
-  task: CompoundTask,
-): PlanResult => {
+  plan: PrimitiveTask<TContext>[],
+  task: CompoundTask<TContext>,
+): PlanResult<TContext> => {
   if (context.LogDecomposition) {
     log.debug(`SequenceTask:OnDecomposeCompoundTask:Decomposing compound task: ${JSON.stringify(plan)}`);
   }
@@ -71,14 +72,14 @@ const onDecomposeCompoundTask = (
 };
 
 // TODO: Fix this (function currently exceeds max-params just like FluidHTN)
-const onDecomposeTask = (
-  context: Context,
-  childTask: CompoundTaskChild,
+const onDecomposeTask = <TContext extends Context<WorldStateBase>>(
+  context: TContext,
+  childTask: CompoundTaskChild<TContext>,
   taskIndex: number,
   oldStackDepth: Record<string, number>,
-  plan: PrimitiveTask[],
-  task: CompoundTask,
-): PlanResult => {
+  plan: PrimitiveTask<TContext>[],
+  task: CompoundTask<TContext>,
+): PlanResult<TContext> => {
   // If the task we're evaluating is invalid, return the existing plan as the result
   if (!childTask.isValid(context)) {
     context.trimToStackDepth(oldStackDepth);
@@ -97,8 +98,9 @@ const onDecomposeTask = (
       log.debug(`Sequence.OnDecomposeTask:Adding primitive task to plan: ${childTask.Name}`);
     }
 
-    childTask.applyEffects(context);
-    plan.push(childTask);
+    const primitive = childTask as PrimitiveTask<TContext>;
+    primitive.applyEffects(context);
+    plan.push(primitive);
   } else if (childTask instanceof PausePlanTask) {
     if (context.LogDecomposition) {
       log.debug(`Sequence.OnDecomposeTask:Return partial plan at index ${taskIndex}!`);
@@ -123,8 +125,8 @@ const onDecomposeTask = (
 };
 
 // For a sequence task, all children need to successfully decompose
-const decompose = (context: Context, startIndex: number, task: CompoundTask): PlanResult => {
-  let result: PlanResult = {
+const decompose = <TContext extends Context<WorldStateBase>>(context: TContext, startIndex: number, task: CompoundTask<TContext>): PlanResult<TContext> => {
+  let result: PlanResult<TContext> = {
     plan: [],
     status: DecompositionStatus.Rejected,
   };

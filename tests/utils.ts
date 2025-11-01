@@ -1,55 +1,61 @@
-import Context from "../src/context";
+import Context, { type WorldStateBase } from "../src/context";
 import Domain from "../src/domain";
 import CompoundTask from "../src/Tasks/compoundTask";
 import PrimitiveTask from "../src/Tasks/primitiveTask";
 import Effect from "../src/effect";
 
-function getEmptyTestContext() {
-  const context = new Context();
+type TestWorldState = {
+  HasA: number;
+  HasB: number;
+  HasC: number;
+  Done: boolean;
+};
 
-  context.WorldState = {
+type TestContext = Context<TestWorldState>;
+
+function getEmptyTestContext(): TestContext {
+  const context = new Context<TestWorldState>({
     HasA: 0,
     HasB: 0,
     HasC: 0,
-  };
-
-  context.Done = false;
+    Done: false,
+  });
 
   return context;
 }
 
-function getEmptyCompoundTask() {
-  return new CompoundTask({
+function getEmptyCompoundTask<TContext extends Context<WorldStateBase> = Context>() {
+  return new CompoundTask<TContext>({
     name: "TestTask",
     type: "sequence",
     conditions: [],
-    effects: [],
+    // effects: [],
     tasks: [],
   });
 }
 
-function getEmptySelectorTask(name) {
-  return new CompoundTask({
+function getEmptySelectorTask<TContext extends Context<WorldStateBase> = Context>(name) {
+  return new CompoundTask<TContext>({
     name,
     type: "select",
     conditions: [],
-    effects: [],
+    // effects: [],
     tasks: [],
   });
 }
 
-function getEmptySequenceTask(name) {
-  return new CompoundTask({
+function getEmptySequenceTask<TContext extends Context<WorldStateBase> = Context>(name) {
+  return new CompoundTask<TContext>({
     name,
     type: "sequence",
     conditions: [],
-    effects: [],
+    // effects: [],
     tasks: [],
   });
 }
 
-function getSimplePrimitiveTask(name) {
-  return new PrimitiveTask({
+function getSimplePrimitiveTask<TContext extends Context<WorldStateBase> = Context>(name) {
+  return new PrimitiveTask<TContext>({
     name,
     conditions: [],
     effects: [],
@@ -57,11 +63,11 @@ function getSimplePrimitiveTask(name) {
 }
 
 function getSimplePrimitiveTaskWithDoneCondition(name) {
-  return getSimplePrimitiveTask(name).addCondition((context) => context.Done === true);
+  return getSimplePrimitiveTask<TestContext>(name).addCondition((context) => context.hasState("Done"));
 }
 
-function getEmptyTestDomain() {
-  return new Domain({ name: "Test" });
+function getEmptyTestDomain<TContext extends Context<WorldStateBase>>() {
+  return new Domain<TContext>({ name: "Test" });
 }
 
 function getSimpleEffect(name, type, state) {
@@ -83,4 +89,9 @@ export {
   getSimplePrimitiveTaskWithDoneCondition,
   getEmptySequenceTask,
   getSimpleEffect,
+};
+
+export type {
+  TestWorldState,
+  TestContext,
 };

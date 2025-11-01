@@ -4,42 +4,42 @@ import DecompositionStatus, { type DecompositionStatusValue } from "./decomposit
 import EffectType from "./effectType";
 import type Effect from "./effect";
 import Domain from "./domain";
-import Context from "./context";
+import Context, { type WorldStateBase } from "./context";
 
-export type PlannerTask = PrimitiveTask;
+export type PlannerTask<TContext extends Context<WorldStateBase> = Context> = PrimitiveTask<TContext>;
 
-type Plan = PrimitiveTask[];
+type Plan<TContext extends Context<WorldStateBase>> = PrimitiveTask<TContext>[];
 
-type TaskCondition = (context: Context) => boolean;
+type TaskCondition<TContext extends Context<WorldStateBase>> = (context: TContext) => boolean;
 
 type PlannerCallback<TArgs extends unknown[]> = (...args: TArgs) => void;
 
-class Planner {
-  private currentTask: PrimitiveTask | null = null;
+class Planner<TContext extends Context<WorldStateBase> = Context> {
+  private currentTask: PrimitiveTask<TContext> | null = null;
 
-  private plan: Plan = [];
+  private plan: Plan<TContext> = [];
 
   private lastStatus?: TaskStatusValue;
 
-  private newPlanCallback?: PlannerCallback<[Plan]>;
+  private newPlanCallback?: PlannerCallback<[Plan<TContext>]>;
 
-  private replacePlanCallback?: PlannerCallback<[Plan, PrimitiveTask | null, Plan]>;
+  private replacePlanCallback?: PlannerCallback<[Plan<TContext>, PrimitiveTask<TContext> | null, Plan<TContext>]>;
 
-  private newTaskCallback?: PlannerCallback<[PrimitiveTask]>;
+  private newTaskCallback?: PlannerCallback<[PrimitiveTask<TContext>]>;
 
-  private newTaskConditionFailedCallback?: PlannerCallback<[PrimitiveTask, TaskCondition]>;
+  private newTaskConditionFailedCallback?: PlannerCallback<[PrimitiveTask<TContext>, TaskCondition<TContext>]>;
 
-  private stopCurrentTaskCallback?: PlannerCallback<[PrimitiveTask]>;
+  private stopCurrentTaskCallback?: PlannerCallback<[PrimitiveTask<TContext>]>;
 
-  private currentTaskCompletedSuccessfullyCallback?: PlannerCallback<[PrimitiveTask]>;
+  private currentTaskCompletedSuccessfullyCallback?: PlannerCallback<[PrimitiveTask<TContext>]>;
 
-  private applyEffectCallback?: PlannerCallback<[Effect]>;
+  private applyEffectCallback?: PlannerCallback<[Effect<TContext>]>;
 
-  private currentTaskFailedCallback?: PlannerCallback<[PrimitiveTask]>;
+  private currentTaskFailedCallback?: PlannerCallback<[PrimitiveTask<TContext>]>;
 
-  private currentTaskContinuesCallback?: PlannerCallback<[PrimitiveTask]>;
+  private currentTaskContinuesCallback?: PlannerCallback<[PrimitiveTask<TContext>]>;
 
-  private currentTaskExecutingConditionFailedCallback?: PlannerCallback<[PrimitiveTask, ExecutingCondition]>;
+  private currentTaskExecutingConditionFailedCallback?: PlannerCallback<[PrimitiveTask<TContext>, ExecutingCondition<TContext>]>;
 
   // ========================================================= PROPERTIES
   get LastStatus(): TaskStatusValue | undefined {
@@ -50,89 +50,89 @@ class Planner {
     this.lastStatus = status;
   }
 
-  get onNewPlan(): PlannerCallback<[Plan]> | undefined {
+  get onNewPlan(): PlannerCallback<[Plan<TContext>]> | undefined {
     return this.newPlanCallback;
   }
 
-  set onNewPlan(callback: PlannerCallback<[Plan]> | undefined) {
+  set onNewPlan(callback: PlannerCallback<[Plan<TContext>]> | undefined) {
     this.newPlanCallback = callback;
   }
 
-  get onReplacePlan(): PlannerCallback<[Plan, PrimitiveTask | null, Plan]> | undefined {
+  get onReplacePlan(): PlannerCallback<[Plan<TContext>, PrimitiveTask<TContext> | null, Plan<TContext>]> | undefined {
     return this.replacePlanCallback;
   }
 
-  set onReplacePlan(callback: PlannerCallback<[Plan, PrimitiveTask | null, Plan]> | undefined) {
+  set onReplacePlan(callback: PlannerCallback<[Plan<TContext>, PrimitiveTask<TContext> | null, Plan<TContext>]> | undefined) {
     this.replacePlanCallback = callback;
   }
 
-  get onNewTask(): PlannerCallback<[PrimitiveTask]> | undefined {
+  get onNewTask(): PlannerCallback<[PrimitiveTask<TContext>]> | undefined {
     return this.newTaskCallback;
   }
 
-  set onNewTask(callback: PlannerCallback<[PrimitiveTask]> | undefined) {
+  set onNewTask(callback: PlannerCallback<[PrimitiveTask<TContext>]> | undefined) {
     this.newTaskCallback = callback;
   }
 
-  get onNewTaskConditionFailed(): PlannerCallback<[PrimitiveTask, TaskCondition]> | undefined {
+  get onNewTaskConditionFailed(): PlannerCallback<[PrimitiveTask<TContext>, TaskCondition<TContext>]> | undefined {
     return this.newTaskConditionFailedCallback;
   }
 
-  set onNewTaskConditionFailed(callback: PlannerCallback<[PrimitiveTask, TaskCondition]> | undefined) {
+  set onNewTaskConditionFailed(callback: PlannerCallback<[PrimitiveTask<TContext>, TaskCondition<TContext>]> | undefined) {
     this.newTaskConditionFailedCallback = callback;
   }
 
   // ========================================================= CALLBACKS
-  get onStopCurrentTask(): PlannerCallback<[PrimitiveTask]> | undefined {
+  get onStopCurrentTask(): PlannerCallback<[PrimitiveTask<TContext>]> | undefined {
     return this.stopCurrentTaskCallback;
   }
 
-  set onStopCurrentTask(callback: PlannerCallback<[PrimitiveTask]> | undefined) {
+  set onStopCurrentTask(callback: PlannerCallback<[PrimitiveTask<TContext>]> | undefined) {
     this.stopCurrentTaskCallback = callback;
   }
 
-  get onCurrentTaskCompletedSuccessfully(): PlannerCallback<[PrimitiveTask]> | undefined {
+  get onCurrentTaskCompletedSuccessfully(): PlannerCallback<[PrimitiveTask<TContext>]> | undefined {
     return this.currentTaskCompletedSuccessfullyCallback;
   }
 
-  set onCurrentTaskCompletedSuccessfully(callback: PlannerCallback<[PrimitiveTask]> | undefined) {
+  set onCurrentTaskCompletedSuccessfully(callback: PlannerCallback<[PrimitiveTask<TContext>]> | undefined) {
     this.currentTaskCompletedSuccessfullyCallback = callback;
   }
 
-  get onApplyEffect(): PlannerCallback<[Effect]> | undefined {
+  get onApplyEffect(): PlannerCallback<[Effect<TContext>]> | undefined {
     return this.applyEffectCallback;
   }
 
-  set onApplyEffect(callback: PlannerCallback<[Effect]> | undefined) {
+  set onApplyEffect(callback: PlannerCallback<[Effect<TContext>]> | undefined) {
     this.applyEffectCallback = callback;
   }
 
-  get onCurrentTaskFailed(): PlannerCallback<[PrimitiveTask]> | undefined {
+  get onCurrentTaskFailed(): PlannerCallback<[PrimitiveTask<TContext>]> | undefined {
     return this.currentTaskFailedCallback;
   }
 
-  set onCurrentTaskFailed(callback: PlannerCallback<[PrimitiveTask]> | undefined) {
+  set onCurrentTaskFailed(callback: PlannerCallback<[PrimitiveTask<TContext>]> | undefined) {
     this.currentTaskFailedCallback = callback;
   }
 
-  get onCurrentTaskContinues(): PlannerCallback<[PrimitiveTask]> | undefined {
+  get onCurrentTaskContinues(): PlannerCallback<[PrimitiveTask<TContext>]> | undefined {
     return this.currentTaskContinuesCallback;
   }
 
-  set onCurrentTaskContinues(callback: PlannerCallback<[PrimitiveTask]> | undefined) {
+  set onCurrentTaskContinues(callback: PlannerCallback<[PrimitiveTask<TContext>]> | undefined) {
     this.currentTaskContinuesCallback = callback;
   }
 
-  get onCurrentTaskExecutingConditionFailed(): PlannerCallback<[PrimitiveTask, ExecutingCondition]> | undefined {
+  get onCurrentTaskExecutingConditionFailed(): PlannerCallback<[PrimitiveTask<TContext>, ExecutingCondition<TContext>]> | undefined {
     return this.currentTaskExecutingConditionFailedCallback;
   }
 
-  set onCurrentTaskExecutingConditionFailed(callback: PlannerCallback<[PrimitiveTask, ExecutingCondition]> | undefined) {
+  set onCurrentTaskExecutingConditionFailed(callback: PlannerCallback<[PrimitiveTask<TContext>, ExecutingCondition<TContext>]> | undefined) {
     this.currentTaskExecutingConditionFailedCallback = callback;
   }
 
   // eslint-disable-next-line complexity -- This closely follows FluidHTN implementation
-  tick(domain: Domain, ctx: Context, allowImmediateReplan = true): void {
+  tick(domain: Domain<TContext>, ctx: TContext, allowImmediateReplan = true): void {
     if (!ctx.IsInitialized) {
       throw new Error("Context was not initialized!");
     }
@@ -191,7 +191,7 @@ class Planner {
 
         this.plan.push(...newPlan);
 
-        if (this.currentTask !== null && this.currentTask instanceof PrimitiveTask) {
+        if (this.currentTask !== null) {
           if (this.onStopCurrentTask) {
             this.onStopCurrentTask(this.currentTask);
           }
@@ -255,27 +255,26 @@ class Planner {
     }
 
     if (this.currentTask) {
-      if (this.currentTask instanceof PrimitiveTask) {
-        if (this.currentTask.operator) {
-          for (const condition of this.currentTask.ExecutingConditions) {
-            // If a condition failed, then the plan failed to progress! A replan is required.
-            if (!condition.func(ctx)) {
-              if (this.onCurrentTaskExecutingConditionFailed) {
-                this.onCurrentTaskExecutingConditionFailed(this.currentTask as PrimitiveTask, condition);
-              }
-
-              this.abortCurrentTask(ctx);
-              this.LastStatus = TaskStatus.Failure;
-
-              if (allowImmediateReplan) {
-                this.tick(domain, ctx, false);
-              }
-
-              return;
+      if (this.currentTask.operator) {
+        for (const condition of this.currentTask.ExecutingConditions) {
+          // If a condition failed, then the plan failed to progress! A replan is required.
+          if (!condition.func(ctx)) {
+            if (this.onCurrentTaskExecutingConditionFailed) {
+              this.onCurrentTaskExecutingConditionFailed(this.currentTask, condition);
             }
-          }
 
-          this.LastStatus = this.currentTask?.operator(ctx);
+            this.abortCurrentTask(ctx);
+            this.LastStatus = TaskStatus.Failure;
+
+            if (allowImmediateReplan) {
+              this.tick(domain, ctx, false);
+            }
+
+            return;
+          }
+        }
+
+        this.LastStatus = this.currentTask.operator(ctx);
 
           // If the operation finished successfully, we set task to null so that we dequeue the next task in the plan the following tick.
           if (this.LastStatus === TaskStatus.Success) {
@@ -322,14 +321,13 @@ class Planner {
             // Otherwise the operation isn't done yet and need to continue.
             this.onCurrentTaskContinues(this.currentTask);
           }
-        } else {
-          // This should not really happen if a domain is set up properly.
-          this.abortCurrentTask(ctx);
-          this.LastStatus = TaskStatus.Failure;
+      } else {
+        // This should not really happen if a domain is set up properly.
+        this.abortCurrentTask(ctx);
+        this.LastStatus = TaskStatus.Failure;
 
-          if (allowImmediateReplan) {
-            this.tick(domain, ctx, false);
-          }
+        if (allowImmediateReplan) {
+          this.tick(domain, ctx, false);
         }
       }
 
@@ -341,17 +339,17 @@ class Planner {
     }
   }
 
-  reset(ctx: Context): void {
+  reset(ctx: TContext): void {
     this.plan = [];
 
-    if (this.currentTask !== null && this.currentTask instanceof PrimitiveTask) {
+    if (this.currentTask !== null) {
       this.currentTask.stop(ctx);
     }
     this.currentTask = null;
   }
 
-  private abortCurrentTask(ctx: Context): void {
-    if (this.currentTask instanceof PrimitiveTask) {
+  private abortCurrentTask(ctx: TContext): void {
+    if (this.currentTask) {
       this.currentTask.abort(ctx);
     }
 
@@ -368,11 +366,11 @@ class Planner {
     ctx.IsDirty = false;
   }
 
-  getPlan(): Plan {
+  getPlan(): Plan<TContext> {
     return this.plan;
   }
 
-  getCurrentTask(): PrimitiveTask | null {
+  getCurrentTask(): PrimitiveTask<TContext> | null {
     return this.currentTask;
   }
 }

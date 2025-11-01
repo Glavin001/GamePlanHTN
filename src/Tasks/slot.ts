@@ -1,4 +1,5 @@
 import type Context from "../context";
+import type { WorldStateBase } from "../context";
 import DecompositionStatus from "../decompositionStatus";
 import type { PlanResult } from "../types";
 import type CompoundTask from "./compoundTask";
@@ -8,11 +9,11 @@ class Slot {
 
   public Name: string;
 
-  public Parent?: CompoundTask;
+  public Parent?: CompoundTask<Context<WorldStateBase>>;
 
   public readonly Conditions: [] = [];
 
-  private subtask: CompoundTask | null = null;
+  private subtask: CompoundTask<Context<WorldStateBase>> | null = null;
 
   constructor(slotId: number, name: string) {
     this.SlotId = slotId;
@@ -27,7 +28,7 @@ class Slot {
     throw new Error("Slot tasks do not support conditions");
   }
 
-  setSubtask(task: CompoundTask): boolean {
+  setSubtask(task: CompoundTask<Context<WorldStateBase>>): boolean {
     if (this.subtask) {
       return false;
     }

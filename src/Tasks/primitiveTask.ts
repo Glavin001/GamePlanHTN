@@ -1,65 +1,65 @@
 import log from "loglevel";
-import Context from "../context";
-import Effect, { EffectDefinition } from "../effect";
+import Context, { type WorldStateBase } from "../context";
+import Effect, { type EffectDefinition } from "../effect";
 import type { TaskStatusValue } from "../taskStatus";
 import type CompoundTask from "./compoundTask";
-import FuncCondition, { type ConditionPredicate } from "../conditions/funcCondition";
+import FuncCondition from "../conditions/funcCondition";
 import FuncOperator from "../operators/funcOperator";
 
-export type TaskCondition<TContext extends Context = Context> = (context: TContext) => boolean;
-export type ConditionLike<TContext extends Context = Context> = TaskCondition<TContext> | FuncCondition;
+export type TaskCondition<TContext extends Context<WorldStateBase> = Context> = (context: TContext) => boolean;
+export type ConditionLike<TContext extends Context<WorldStateBase> = Context> = TaskCondition<TContext> | FuncCondition<TContext>;
 
-export interface ExecutingCondition {
+export interface ExecutingCondition<TContext extends Context<WorldStateBase> = Context> {
   Name: string;
-  func: TaskCondition;
+  func: TaskCondition<TContext>;
 }
 
-export type PrimitiveTaskOperatorFunction = (context: Context) => TaskStatusValue;
-export type PrimitiveTaskOperator = PrimitiveTaskOperatorFunction | FuncOperator;
+export type PrimitiveTaskOperatorFunction<TContext extends Context<WorldStateBase> = Context> = (context: TContext) => TaskStatusValue;
+export type PrimitiveTaskOperator<TContext extends Context<WorldStateBase> = Context> = PrimitiveTaskOperatorFunction<TContext> | FuncOperator;
 
-export interface PrimitiveTaskConfig {
+export interface PrimitiveTaskConfig<TContext extends Context<WorldStateBase> = Context> {
   name: string;
-  operator?: PrimitiveTaskOperator;
-  conditions?: ConditionLike[];
-  effects?: EffectDefinition[];
-  stop?: (context: Context) => void;
-  abort?: (context: Context) => void;
+  operator?: PrimitiveTaskOperator<TContext>;
+  conditions?: ConditionLike<TContext>[];
+  effects?: EffectDefinition<TContext>[];
+  stop?: (context: TContext) => void;
+  abort?: (context: TContext) => void;
 }
 
-export type PrimitiveTaskProps = PrimitiveTaskConfig | PrimitiveTaskOperator;
+export type PrimitiveTaskProps<TContext extends Context<WorldStateBase> = Context> = PrimitiveTaskConfig<TContext> | PrimitiveTaskOperator<TContext>;
 
-const unwrapCondition = (condition: ConditionLike): TaskCondition => {
+const unwrapCondition = <TContext extends Context<WorldStateBase>>(condition: ConditionLike<TContext>): TaskCondition<TContext> => {
   if (condition instanceof FuncCondition) {
-    return (context: Context) => condition.isValid(context);
+    return (context: TContext) => condition.isValid(context);
   }
 
-  return condition as ConditionPredicate;
+  return condition as TaskCondition<TContext>;
 };
 
-class PrimitiveTask {
+class PrimitiveTask<TContext extends Context<WorldStateBase> = Context> {
   public Name = "";
 
-  public Conditions: TaskCondition[] = [];
+  public Conditions: TaskCondition<TContext>[] = [];
 
-  public Effects: Effect[] = [];
+  public Effects: Effect<TContext>[] = [];
 
-  public ExecutingConditions: ExecutingCondition[] = [];
+  public ExecutingConditions: ExecutingCondition<TContext>[] = [];
 
-  public Parent?: CompoundTask;
+  public Parent?: CompoundTask<TContext>;
 
-  public operator?: PrimitiveTaskOperatorFunction;
+  public operator?: PrimitiveTaskOperatorFunction<TContext>;
 
-  private operatorSource?: PrimitiveTaskOperator;
+  private operatorSource?: PrimitiveTaskOperator<TContext>;
 
-  private stopAction?: (context: Context) => void;
+  private stopAction?: (context: TContext) => void;
 
-  private abortAction?: (context: Context) => void;
+  private abortAction?: (context: TContext) => void;
 
-  private utilityScore?: (context: Context) => number;
+  private utilityScore?: (context: TContext) => number;
 
-  private goapCost?: (context: Context) => number;
+  private goapCost?: (context: TContext) => number;
 
-  constructor(props: PrimitiveTaskProps) {
+  constructor(props: PrimitiveTaskProps<TContext>) {
     // Process the operation, which can be either a raw function or an object containing an
     // operator field
     if (props instanceof FuncOperator || typeof props === "function") {
@@ -84,9 +84,9 @@ class PrimitiveTask {
       if (Array.isArray(props.effects)) {
         props.effects.forEach((effect) => {
           if (effect instanceof Effect) {
-            this.Effects.push(effect);
+            this.Effects.push(effect as Effect<TContext>);
           } else {
-            this.Effects.push(new Effect(effect));
+            this.Effects.push(new Effect<TContext>(effect));
           }
         });
       }
@@ -119,7 +119,7 @@ class PrimitiveTask {
         return false;
       }
 
-      if (this.Conditions[index](context) === false) {
+      if (this.Conditions[index](context as TContext) === false) {
         return false;
       }
     }
@@ -133,17 +133,17 @@ class PrimitiveTask {
     });
   }
 
-  addCondition(condition: ConditionLike): this {
+  addCondition(condition: ConditionLike<TContext>): this {
     this.Conditions.push(unwrapCondition(condition));
 
     return this;
   }
 
-  addExecutingCondition(condition: ExecutingCondition | FuncCondition): this {
+  addExecutingCondition(condition: ExecutingCondition<TContext> | FuncCondition<TContext>): this {
     if (condition instanceof FuncCondition) {
       this.ExecutingConditions.push({
         Name: condition.Name,
-        func: (context: Context) => condition.isValid(context),
+        func: (context: TContext) => condition.isValid(context),
       });
     } else {
       this.ExecutingConditions.push(condition);
@@ -152,17 +152,17 @@ class PrimitiveTask {
     return this;
   }
 
-  addEffect(effect: Effect | EffectDefinition): this {
+  addEffect(effect: Effect<TContext> | EffectDefinition<TContext>): this {
     if (effect instanceof Effect) {
-      this.Effects.push(effect);
+      this.Effects.push(effect as Effect<TContext>);
     } else {
-      this.Effects.push(new Effect(effect));
+      this.Effects.push(new Effect<TContext>(effect));
     }
 
     return this;
   }
 
-  setUtilityScore(score?: (context: Context) => number): this {
+  setUtilityScore(score?: (context: TContext) => number): this {
     this.utilityScore = score;
 
     return this;
@@ -170,13 +170,13 @@ class PrimitiveTask {
 
   getUtilityScore(context: Context): number {
     if (typeof this.utilityScore === "function") {
-      return this.utilityScore(context);
+      return this.utilityScore(context as TContext);
     }
 
     return 0;
   }
 
-  setGoapCost(cost?: (context: Context) => number): this {
+  setGoapCost(cost?: (context: TContext) => number): this {
     this.goapCost = cost;
 
     return this;
@@ -184,43 +184,43 @@ class PrimitiveTask {
 
   getGoapCost(context: Context): number {
     if (typeof this.goapCost === "function") {
-      return this.goapCost(context);
+      return this.goapCost(context as TContext);
     }
 
     return 1;
   }
 
-  stop(context?: Context | null): void {
+  stop(context?: TContext | null): void {
     if (!(context instanceof Context)) {
       throw new TypeError("Unexpected context type!");
     }
 
     // Stop and abort use the optional callbacks provided when configuring the operator.
     if (this.stopAction) {
-      this.stopAction(context);
+      this.stopAction(context as TContext);
     }
   }
 
-  abort(context?: Context | null): void {
+  abort(context?: TContext | null): void {
     if (!(context instanceof Context)) {
       throw new TypeError("Unexpected context type!");
     }
 
     if (this.abortAction) {
-      this.abortAction(context);
+      this.abortAction(context as TContext);
     }
   }
 
   setOperator(
-    operator: PrimitiveTaskOperator | undefined,
-    forceStop?: (context: Context) => void,
-    abort?: (context: Context) => void,
+    operator: PrimitiveTaskOperator<TContext> | undefined,
+    forceStop?: (context: TContext) => void,
+    abort?: (context: TContext) => void,
   ): this {
     if (operator instanceof FuncOperator) {
       return this.setOperator(
-        (context: Context) => operator.update(context),
-        (context: Context) => operator.stop(context),
-        (context: Context) => operator.abort(context),
+        (context: TContext) => operator.update(context),
+        (context: TContext) => operator.stop(context),
+        (context: TContext) => operator.abort(context),
       );
     }
 

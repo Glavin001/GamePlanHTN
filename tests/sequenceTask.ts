@@ -5,19 +5,22 @@ import DecompositionStatus from "../src/decompositionStatus";
 import Effect from "../src/effect";
 import EffectType from "../src/effectType";
 import * as TestUtil from "./utils";
+import type { TestContext } from "./utils";
 import PausePlanTask from "../src/Tasks/pausePlanTask";
+import FuncCondition from "../src/conditions/funcCondition";
+import PrimitiveTask from "../src/Tasks/primitiveTask";
 
 test("Add Condition", () => {
-  const task = TestUtil.getEmptySequenceTask("Test");
-  const t = task.addCondition((context) => context.Done === false);
+  const task = TestUtil.getEmptySequenceTask<TestContext>("Test");
+  const t = task.addCondition((context) => context.hasState("Done", false));
 
   assert.equal(t, task);
   assert.equal(task.Conditions.length, 1);
 });
 
 test("Add Subtask", () => {
-  const task = TestUtil.getEmptySequenceTask("Test");
-  const t = task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task"));
+  const task = TestUtil.getEmptySequenceTask<TestContext>("Test");
+  const t = task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task"));
 
 
   assert.equal(t, task);
@@ -25,7 +28,7 @@ test("Add Subtask", () => {
 });
 
 test("IsValid fails without subtasks", () => {
-  const task = TestUtil.getEmptySequenceTask("Test");
+  const task = TestUtil.getEmptySequenceTask<TestContext>("Test");
   const ctx = TestUtil.getEmptyTestContext();
 
   assert.not(task.isValid(ctx));
@@ -33,16 +36,16 @@ test("IsValid fails without subtasks", () => {
 
 
 test("IsValid expected behavior", () => {
-  const task = TestUtil.getEmptySequenceTask("Test");
+  const task = TestUtil.getEmptySequenceTask<TestContext>("Test");
   const ctx = TestUtil.getEmptyTestContext();
 
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task"));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task"));
 
   assert.ok(task.isValid(ctx));
 });
 
 test("Decompose throws on unintialized context expected behavior", () => {
-  const task = TestUtil.getEmptySequenceTask("Test");
+  const task = TestUtil.getEmptySequenceTask<TestContext>("Test");
   const ctx = TestUtil.getEmptyTestContext();
 
   assert.throws(() => {
@@ -54,7 +57,7 @@ test("Decompose with no subtasks expected behavior", () => {
   const ctx = TestUtil.getEmptyTestContext();
 
   ctx.init();
-  const task = TestUtil.getEmptySequenceTask("Test");
+  const task = TestUtil.getEmptySequenceTask<TestContext>("Test");
 
   const status = task.decompose(ctx, 0);
 
@@ -67,10 +70,10 @@ test("Decompose with subtasks expected behavior", () => {
   const ctx = TestUtil.getEmptyTestContext();
 
   ctx.init();
-  const task = TestUtil.getEmptySequenceTask("Test");
+  const task = TestUtil.getEmptySequenceTask<TestContext>("Test");
 
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task1"));
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task2"));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task1"));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2"));
   const status = task.decompose(ctx, 0);
 
   assert.equal(status.status, DecompositionStatus.Succeeded);
@@ -83,19 +86,19 @@ test("Decompose nested subtasks expected behavior", () => {
   const ctx = TestUtil.getEmptyTestContext();
 
   ctx.init();
-  const task = TestUtil.getEmptySequenceTask("Test");
-  const task2 = TestUtil.getEmptySelectorTask("Test2");
-  const task3 = TestUtil.getEmptySelectorTask("Test3");
+  const task = TestUtil.getEmptySequenceTask<TestContext>("Test");
+  const task2 = TestUtil.getEmptySelectorTask<TestContext>("Test2");
+  const task3 = TestUtil.getEmptySelectorTask<TestContext>("Test3");
 
-  task3.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task1")
-    .addCondition("Done == true", (context) => context.Done === true));
-  task3.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task2"));
+  task3.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task1")
+    .addCondition(new FuncCondition("Done == true", (context) => context.hasState("Done"))));
+  task3.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2"));
 
   task2.addSubtask(task3);
-  task2.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task3"));
+  task2.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task3"));
 
   task.addSubtask(task2);
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task4"));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task4"));
 
   const status = task.decompose(ctx, 0);
 
@@ -112,11 +115,11 @@ test("Decompose with subtasks one fail expected behavior", () => {
   ctx.init();
   ctx.ContextState = ContextState.Planning;
 
-  const task = TestUtil.getEmptySequenceTask("Test");
+  const task = TestUtil.getEmptySequenceTask<TestContext>("Test");
 
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task1"));
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task2")
-    .addCondition("Done == true", (context) => context.Done === true));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task1"));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2")
+    .addCondition(new FuncCondition("Done == true", (context) => context.hasState("Done"))));
   const status = task.decompose(ctx, 0);
 
   assert.equal(status.status, DecompositionStatus.Failed);
@@ -130,10 +133,10 @@ test("Decompose with subtask compound subtask fails expected behavior", () => {
   ctx.init();
   ctx.ContextState = ContextState.Planning;
 
-  const task = TestUtil.getEmptySequenceTask("Test");
+  const task = TestUtil.getEmptySequenceTask<TestContext>("Test");
 
-  task.addSubtask(TestUtil.getEmptySelectorTask("Sub-task1"));
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task2"));
+  task.addSubtask(TestUtil.getEmptySelectorTask<TestContext>("Sub-task1"));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2"));
   const status = task.decompose(ctx, 0);
 
   assert.equal(status.status, DecompositionStatus.Failed);
@@ -151,15 +154,15 @@ test("Decompose Failure return to previous world state expected behavior", () =>
   ctx.setState("HasB", 1, true, EffectType.Permanent);
   ctx.setState("HasC", 1, true, EffectType.PlanOnly);
 
-  const task = TestUtil.getEmptySequenceTask("Test");
+  const task = TestUtil.getEmptySequenceTask<TestContext>("Test");
 
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task1")
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task1")
     .addEffect(new Effect({
       name: "TestEffect",
       type: EffectType.Permanent,
       action: (context, _type) => context.setState("HasA", 0, true, EffectType.PlanOnly),
     })));
-  task.addSubtask(TestUtil.getEmptySelectorTask("Sub-task2"));
+  task.addSubtask(TestUtil.getEmptySelectorTask<TestContext>("Sub-task2"));
   const { status, plan } = task.decompose(ctx, 0);
 
   assert.equal(status, DecompositionStatus.Failed);
@@ -180,19 +183,19 @@ test("Decompose Nested Compound Subtask lost to MTR expected behavior", () => {
   ctx.init();
   ctx.ContextState = ContextState.Planning;
 
-  const task = TestUtil.getEmptySequenceTask("Test");
-  const task2 = TestUtil.getEmptySelectorTask("Test2");
-  const task3 = TestUtil.getEmptySelectorTask("Test3");
+  const task = TestUtil.getEmptySequenceTask<TestContext>("Test");
+  const task2 = TestUtil.getEmptySelectorTask<TestContext>("Test2");
+  const task3 = TestUtil.getEmptySelectorTask<TestContext>("Test3");
 
-  task3.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task1")
-    .addCondition((context) => context.Done === true));
-  task3.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task2"));
+  task3.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task1")
+    .addCondition((context) => context.hasState("Done")));
+  task3.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2"));
 
   task2.addSubtask(task3);
-  task2.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task3"));
+  task2.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task3"));
 
   task.addSubtask(task2);
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task4"));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task4"));
 
   ctx.LastMTR.push(0);
   ctx.LastMTR.push(0);
@@ -212,20 +215,20 @@ test("Decompose Nested Compound Subtask lost to MTR 2 expected behavior", () => 
   ctx.init();
   ctx.ContextState = ContextState.Planning;
 
-  const task = TestUtil.getEmptySequenceTask("Test");
-  const task2 = TestUtil.getEmptySelectorTask("Test2");
-  const task3 = TestUtil.getEmptySelectorTask("Test3");
+  const task = TestUtil.getEmptySequenceTask<TestContext>("Test");
+  const task2 = TestUtil.getEmptySelectorTask<TestContext>("Test2");
+  const task3 = TestUtil.getEmptySelectorTask<TestContext>("Test3");
 
-  task3.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task1")
-    .addCondition((context) => context.Done === true));
-  task3.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task2"));
+  task3.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task1")
+    .addCondition((context) => context.hasState("Done")));
+  task3.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2"));
 
-  task2.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task3")
-    .addCondition((context) => context.Done === true));
+  task2.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task3")
+    .addCondition((context) => context.hasState("Done")));
   task2.addSubtask(task3);
 
   task.addSubtask(task2);
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task4"));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task4"));
 
   ctx.LastMTR.push(1);
   ctx.LastMTR.push(0);
@@ -244,20 +247,20 @@ test("Decompose Nested Compound Subtask equal to MTR expected behavior", () => {
 
   ctx.init();
 
-  const task = TestUtil.getEmptySequenceTask("Test");
-  const task2 = TestUtil.getEmptySelectorTask("Test2");
-  const task3 = TestUtil.getEmptySelectorTask("Test3");
+  const task = TestUtil.getEmptySequenceTask<TestContext>("Test");
+  const task2 = TestUtil.getEmptySelectorTask<TestContext>("Test2");
+  const task3 = TestUtil.getEmptySelectorTask<TestContext>("Test3");
 
-  task3.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task2")
-    .addCondition((context) => context.Done === true));
-  task3.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task3"));
+  task3.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2")
+    .addCondition((context) => context.hasState("Done")));
+  task3.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task3"));
 
-  task2.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task1")
-    .addCondition((context) => context.Done === true));
+  task2.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task1")
+    .addCondition((context) => context.hasState("Done")));
   task2.addSubtask(task3);
 
   task.addSubtask(task2);
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task4"));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task4"));
 
   ctx.LastMTR.push(1);
   ctx.LastMTR.push(1);
@@ -283,13 +286,13 @@ test("Decompose Nested Compound Subtask lost to MTR return to previous world sta
   ctx.setState("HasB", 1, true, EffectType.Permanent);
   ctx.setState("HasC", 1, true, EffectType.PlanOnly);
 
-  const task = TestUtil.getEmptySequenceTask("Test");
-  const task2 = TestUtil.getEmptySelectorTask("Test2");
-  const task3 = TestUtil.getEmptySelectorTask("Test3");
+  const task = TestUtil.getEmptySequenceTask<TestContext>("Test");
+  const task2 = TestUtil.getEmptySelectorTask<TestContext>("Test2");
+  const task3 = TestUtil.getEmptySelectorTask<TestContext>("Test3");
 
-  task3.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task2")
-    .addCondition((context) => context.Done === true));
-  task3.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task3")
+  task3.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2")
+    .addCondition((context) => context.hasState("Done")));
+  task3.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task3")
     .addEffect(new Effect({
       name: "TestEffect",
       type: EffectType.Permanent,
@@ -297,20 +300,20 @@ test("Decompose Nested Compound Subtask lost to MTR return to previous world sta
     })));
 
   task2.addSubtask(task3);
-  task2.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task4")
+  task2.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task4")
     .addEffect(new Effect({
       name: "TestEffect",
       type: EffectType.Permanent,
       action: (context, _type) => context.setState("HasB", 0, true, EffectType.PlanOnly),
     })));
 
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task1")
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task1")
     .addEffect(new Effect({
       name: "TestEffect",
       type: EffectType.Permanent, action: (context, _type) => context.setState("HasA", 0, true, EffectType.PlanOnly),
     })));
   task.addSubtask(task2);
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task5")
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task5")
     .addEffect(
       new Effect({
         name: "TestEffect",
@@ -345,13 +348,13 @@ test("Decompose Nested Compound Subtask Fail Return to Previous World State expe
   ctx.setState("HasB", 1, true, EffectType.Permanent);
   ctx.setState("HasC", 1, true, EffectType.PlanOnly);
 
-  const task = TestUtil.getEmptySequenceTask("Test");
-  const task2 = TestUtil.getEmptySequenceTask("Test2");
-  const task3 = TestUtil.getEmptySequenceTask("Test3");
+  const task = TestUtil.getEmptySequenceTask<TestContext>("Test");
+  const task2 = TestUtil.getEmptySequenceTask<TestContext>("Test2");
+  const task3 = TestUtil.getEmptySequenceTask<TestContext>("Test3");
 
-  task3.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task2")
-    .addCondition((context) => context.Done === true));
-  task3.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task3")
+  task3.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2")
+    .addCondition((context) => context.hasState("Done")));
+  task3.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task3")
     .addEffect(new Effect({
       name: "TestEffect",
       type: EffectType.Permanent,
@@ -359,14 +362,14 @@ test("Decompose Nested Compound Subtask Fail Return to Previous World State expe
     })));
 
   task2.addSubtask(task3);
-  task2.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task4")
+  task2.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task4")
     .addEffect(new Effect({
       name: "TestEffect",
       type: EffectType.Permanent,
       action: (context, _type) => context.setState("HasB", 0, true, EffectType.PlanOnly),
     })));
 
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task1")
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task1")
     .addEffect(new Effect({
       name: "TestEffect",
       type: EffectType.Permanent,
@@ -374,7 +377,7 @@ test("Decompose Nested Compound Subtask Fail Return to Previous World State expe
     })));
   task.addSubtask(task2);
 
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task5")
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task5")
     .addEffect(new Effect({
       name: "TestEffect",
       type: EffectType.Permanent,
@@ -401,11 +404,11 @@ test("PausePlan expected behavior", () => {
 
   ctx.init();
 
-  const task = TestUtil.getEmptySequenceTask("Test");
+  const task = TestUtil.getEmptySequenceTask<TestContext>("Test");
 
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task1"));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task1"));
   task.addSubtask(new PausePlanTask());
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task2"));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2"));
 
   const { status, plan } = task.decompose(ctx, 0);
 
@@ -424,11 +427,11 @@ test("Continue PausePlan expected behavior", () => {
 
   ctx.init();
 
-  const task = TestUtil.getEmptySequenceTask("Test");
+  const task = TestUtil.getEmptySequenceTask<TestContext>("Test");
 
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task1"));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task1"));
   task.addSubtask(new PausePlanTask());
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task2"));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2"));
 
   // eslint-disable-next-line prefer-const -- plan is not const
   let { status, plan } = task.decompose(ctx, 0);
@@ -451,7 +454,7 @@ test("Continue PausePlan expected behavior", () => {
 
     if (s === DecompositionStatus.Succeeded || s === DecompositionStatus.Partial) {
       while (p.length > 0) {
-        plan.push(p.shift());
+        plan.push(p.shift() as PrimitiveTask<TestContext>);
       }
     }
   }
@@ -466,19 +469,19 @@ test("Nested PausePlan expected behavior", () => {
 
   ctx.init();
 
-  const task = TestUtil.getEmptySequenceTask("Test");
-  const task2 = TestUtil.getEmptySelectorTask("Test2");
-  const task3 = TestUtil.getEmptySequenceTask("Test3");
+  const task = TestUtil.getEmptySequenceTask<TestContext>("Test");
+  const task2 = TestUtil.getEmptySelectorTask<TestContext>("Test2");
+  const task3 = TestUtil.getEmptySequenceTask<TestContext>("Test3");
 
-  task3.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task1"));
+  task3.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task1"));
   task3.addSubtask(new PausePlanTask());
-  task3.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task2"));
+  task3.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2"));
 
   task2.addSubtask(task3);
-  task2.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task3"));
+  task2.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task3"));
 
   task.addSubtask(task2);
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task4"));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task4"));
 
   const { status, plan } = task.decompose(ctx, 0);
 
@@ -502,19 +505,19 @@ test("Continue Nested PausePlan expected behavior", () => {
 
   ctx.init();
 
-  const task = TestUtil.getEmptySequenceTask("Test");
-  const task2 = TestUtil.getEmptySelectorTask("Test2");
-  const task3 = TestUtil.getEmptySequenceTask("Test3");
+  const task = TestUtil.getEmptySequenceTask<TestContext>("Test");
+  const task2 = TestUtil.getEmptySelectorTask<TestContext>("Test2");
+  const task3 = TestUtil.getEmptySequenceTask<TestContext>("Test3");
 
-  task3.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task1"));
+  task3.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task1"));
   task3.addSubtask(new PausePlanTask());
-  task3.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task2"));
+  task3.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2"));
 
   task2.addSubtask(task3);
-  task2.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task3"));
+  task2.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task3"));
 
   task.addSubtask(task2);
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task4"));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task4"));
 
   // eslint-disable-next-line prefer-const -- plan is mutable
   let { status, plan } = task.decompose(ctx, 0);
@@ -540,7 +543,7 @@ test("Continue Nested PausePlan expected behavior", () => {
 
     if (s === DecompositionStatus.Succeeded || s === DecompositionStatus.Partial) {
       while (p.length > 0) {
-        plan.push(p.shift());
+        plan.push(p.shift() as PrimitiveTask<TestContext>);
       }
     }
 
@@ -560,26 +563,26 @@ test("Continue Multiple Nested PausePlan expected behavior", () => {
 
   ctx.init();
 
-  const task = TestUtil.getEmptySequenceTask("Test");
-  const task2 = TestUtil.getEmptySelectorTask("Test2");
-  const task3 = TestUtil.getEmptySequenceTask("Test3");
-  const task4 = TestUtil.getEmptySequenceTask("Test4");
+  const task = TestUtil.getEmptySequenceTask<TestContext>("Test");
+  const task2 = TestUtil.getEmptySelectorTask<TestContext>("Test2");
+  const task3 = TestUtil.getEmptySequenceTask<TestContext>("Test3");
+  const task4 = TestUtil.getEmptySequenceTask<TestContext>("Test4");
 
-  task3.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task1"));
+  task3.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task1"));
   task3.addSubtask(new PausePlanTask());
-  task3.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task2"));
+  task3.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2"));
 
   task2.addSubtask(task3);
-  task2.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task3"));
+  task2.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task3"));
 
-  task4.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task5"));
+  task4.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task5"));
   task4.addSubtask(new PausePlanTask());
-  task4.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task6"));
+  task4.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task6"));
 
   task.addSubtask(task2);
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task4"));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task4"));
   task.addSubtask(task4);
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task7"));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task7"));
 
   // eslint-disable-next-line prefer-const -- plan is mutable
   let { status, plan } = task.decompose(ctx, 0);
@@ -606,7 +609,7 @@ test("Continue Multiple Nested PausePlan expected behavior", () => {
 
     if (s === DecompositionStatus.Succeeded || s === DecompositionStatus.Partial) {
       while (p.length > 0) {
-        plan.push(p.shift());
+        plan.push(p.shift() as PrimitiveTask<TestContext>);
       }
     }
 
@@ -629,7 +632,7 @@ test("Continue Multiple Nested PausePlan expected behavior", () => {
 
     if (s === DecompositionStatus.Succeeded || s === DecompositionStatus.Partial) {
       while (p.length > 0) {
-        plan.push(p.shift());
+        plan.push(p.shift() as PrimitiveTask<TestContext>);
       }
     }
 

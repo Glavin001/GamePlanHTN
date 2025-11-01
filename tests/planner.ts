@@ -8,6 +8,7 @@ import Planner from "../src/planner";
 import PrimitiveTask from "../src/Tasks/primitiveTask";
 import TaskStatus from "../src/taskStatus";
 import * as TestUtil from "./utils";
+import type { TestContext } from "./utils";
 
 
 test("Get Plan returns instance at start ", () => {
@@ -72,7 +73,7 @@ test("Tick with primitive task without operator expected behavior ", () => {
   const planner = new Planner();
   const domain = TestUtil.getEmptyTestDomain();
   const task1 = TestUtil.getEmptySelectorTask("Test");
-  const task2 = new PrimitiveTask({ name: "Sub-task" });
+  const task2 = new PrimitiveTask<TestContext>({ name: "Sub-task" });
 
   domain.add(domain.Root, task1);
   domain.add(task1, task2);
@@ -93,7 +94,7 @@ test("Planner aborts task when runtime condition fails", () => {
   const task1 = TestUtil.getEmptySelectorTask("Test");
   let callCount = 0;
   let aborted = false;
-  const task2 = new PrimitiveTask({
+  const task2 = new PrimitiveTask<TestContext>({
     name: "Conditional",
     operator: () => TaskStatus.Success,
     abort: () => {
@@ -123,7 +124,7 @@ test("Tick with operator with null function expected behavior ", () => {
 
   const domain = TestUtil.getEmptyTestDomain();
   const task1 = TestUtil.getEmptySelectorTask("Test");
-  const task2 = new PrimitiveTask({ name: "Sub-task" });
+  const task2 = new PrimitiveTask<TestContext>({ name: "Sub-task" });
 
   task2.setOperator(undefined);
   domain.add(domain.Root, task1);
@@ -145,7 +146,7 @@ test("Tick with default success operator won't stack overflow expected behavior 
   const domain = TestUtil.getEmptyTestDomain();
 
   const task1 = TestUtil.getEmptySelectorTask("Test");
-  const task2 = TestUtil.getSimplePrimitiveTask("Sub-task");
+  const task2 = TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task");
 
   task2.setOperator((_context) => TaskStatus.Success);
   domain.add(domain.Root, task1);
@@ -167,7 +168,7 @@ test("Tick with default continue operator expected behavior", () => {
 
   const domain = TestUtil.getEmptyTestDomain();
   const task1 = TestUtil.getEmptySelectorTask("Test");
-  const task2 = TestUtil.getSimplePrimitiveTask("Sub-task");
+  const task2 = TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task");
 
   task2.setOperator((_context) => TaskStatus.Continue);
   domain.add(domain.Root, task1);
@@ -188,7 +189,7 @@ test("Planner aborts task when executing condition fails", () => {
   const domain = TestUtil.getEmptyTestDomain();
   const task1 = TestUtil.getEmptySelectorTask("Test");
   let aborted = false;
-  const task2 = new PrimitiveTask({
+  const task2 = new PrimitiveTask<TestContext>({
     name: "Exec conditional",
     operator: () => TaskStatus.Continue,
     abort: () => {
@@ -218,7 +219,7 @@ test("Planner aborts task when operator fails", () => {
   const domain = TestUtil.getEmptyTestDomain();
   const task1 = TestUtil.getEmptySelectorTask("Test");
   let aborted = false;
-  const task2 = new PrimitiveTask({
+  const task2 = new PrimitiveTask<TestContext>({
     name: "Fails",
     operator: () => TaskStatus.Failure,
     abort: () => {
@@ -248,7 +249,7 @@ test("On New Plan expected behavior ", () => {
 
   const domain = TestUtil.getEmptyTestDomain();
   const task1 = TestUtil.getEmptySelectorTask("Test");
-  const task2 = TestUtil.getSimplePrimitiveTask("Sub-task");
+  const task2 = TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task");
 
   task2.setOperator((_context) => TaskStatus.Continue);
   domain.add(domain.Root, task1);
@@ -274,8 +275,8 @@ test("On Replace Plan expected behavior ", () => {
   const domain = TestUtil.getEmptyTestDomain();
   const task1 = TestUtil.getEmptySelectorTask("Test");
   const task2 = TestUtil.getEmptySelectorTask("Test2");
-  const task3 = new PrimitiveTask({ name: "Sub-task1" }).addCondition((context) => context.Done === false);
-  const task4 = new PrimitiveTask({ name: "Sub-task2" });
+  const task3 = new PrimitiveTask<TestContext>({ name: "Sub-task1" }).addCondition((context) => !context.hasState("Done"));
+  const task4 = new PrimitiveTask<TestContext>({ name: "Sub-task2" });
 
   task3.setOperator((_context) => TaskStatus.Continue);
   task4.setOperator((_context) => TaskStatus.Continue);
@@ -284,10 +285,10 @@ test("On Replace Plan expected behavior ", () => {
   domain.add(task1, task3);
   domain.add(task2, task4);
 
-  ctx.Done = true;
+  ctx.setState("Done", true, false);
   planner.tick(domain, ctx);
 
-  ctx.Done = false;
+  ctx.setState("Done", false, false);
   ctx.IsDirty = true;
   planner.tick(domain, ctx);
 
@@ -306,7 +307,7 @@ test("On New Task expected behavior ", () => {
   };
   const domain = TestUtil.getEmptyTestDomain();
   const task1 = TestUtil.getEmptySelectorTask("Test");
-  const task2 = TestUtil.getSimplePrimitiveTask("Sub-task");
+  const task2 = TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task");
 
   task2.setOperator((_context) => TaskStatus.Continue);
   domain.add(domain.Root, task1);
@@ -330,8 +331,8 @@ test("On New Task Condition Failed expected behavior ", () => {
   const domain = TestUtil.getEmptyTestDomain();
   const task1 = TestUtil.getEmptySelectorTask("Test");
   const task2 = TestUtil.getEmptySelectorTask("Test2");
-  const task3 = new PrimitiveTask({ name: "Sub-task1" }).addCondition((context) => context.Done === false);
-  const task4 = new PrimitiveTask({ Nname: "Sub-task2" });
+  const task3 = new PrimitiveTask<TestContext>({ name: "Sub-task1" }).addCondition((context) => !context.hasState("Done"));
+  const task4 = new PrimitiveTask<TestContext>({ name: "Sub-task2" });
 
   task3.setOperator((_context) => TaskStatus.Success);
   // Note that one should not use AddEffect on types that's not part of WorldState unless you
@@ -343,7 +344,7 @@ test("On New Task Condition Failed expected behavior ", () => {
     name: "TestEffect",
     type: EffectType.PlanAndExecute,
     action: (context, _type) => {
-      context.Done = true;
+      context.setState("Done", true, false);
     },
   }));
 
@@ -353,10 +354,10 @@ test("On New Task Condition Failed expected behavior ", () => {
   domain.add(task1, task3);
   domain.add(task2, task4);
 
-  ctx.Done = true;
+  ctx.setState("Done", true, false);
   planner.tick(domain, ctx);
 
-  ctx.Done = false;
+  ctx.setState("Done", false, false);
   ctx.IsDirty = true;
   planner.tick(domain, ctx);
 
@@ -377,9 +378,9 @@ test("On Stop Current Task expected behavior ", () => {
   const domain = TestUtil.getEmptyTestDomain();
   const task1 = TestUtil.getEmptySelectorTask("Test");
   const task2 = TestUtil.getEmptySelectorTask("Test2");
-  const task3 = new PrimitiveTask({ name: "Sub-task1" })
-    .addCondition((context) => context.Done === false);
-  const task4 = new PrimitiveTask({ name: "Sub-task2" });
+  const task3 = new PrimitiveTask<TestContext>({ name: "Sub-task1" })
+    .addCondition((context) => !context.hasState("Done"));
+  const task4 = new PrimitiveTask<TestContext>({ name: "Sub-task2" });
 
   task3.setOperator((_context) => TaskStatus.Continue);
   task4.setOperator((_context) => TaskStatus.Continue);
@@ -388,10 +389,10 @@ test("On Stop Current Task expected behavior ", () => {
   domain.add(task1, task3);
   domain.add(task2, task4);
 
-  ctx.Done = true;
+  ctx.setState("Done", true, false);
   planner.tick(domain, ctx);
 
-  ctx.Done = false;
+  ctx.setState("Done", false, false);
   ctx.IsDirty = true;
   planner.tick(domain, ctx);
 
@@ -412,9 +413,9 @@ test("On Current Task Completed Successfully expected behavior ", () => {
   const domain = TestUtil.getEmptyTestDomain();
   const task1 = TestUtil.getEmptySelectorTask("Test");
   const task2 = TestUtil.getEmptySelectorTask("Test2");
-  const task3 = new PrimitiveTask({ name: "Sub-task1" })
-    .addCondition((context) => context.Done === false);
-  const task4 = new PrimitiveTask({ name: "Sub-task2" });
+  const task3 = new PrimitiveTask<TestContext>({ name: "Sub-task1" })
+    .addCondition((context) => !context.hasState("Done"));
+  const task4 = new PrimitiveTask<TestContext>({ name: "Sub-task2" });
 
   task3.setOperator((_context) => TaskStatus.Success);
   task4.setOperator((_context) => TaskStatus.Continue);
@@ -423,10 +424,10 @@ test("On Current Task Completed Successfully expected behavior ", () => {
   domain.add(task1, task3);
   domain.add(task2, task4);
 
-  ctx.Done = true;
+  ctx.setState("Done", true, false);
   planner.tick(domain, ctx);
 
-  ctx.Done = false;
+  ctx.setState("Done", false, false);
   ctx.IsDirty = true;
   planner.tick(domain, ctx);
 
@@ -447,9 +448,9 @@ test("On Apply Effec expected behavior ", () => {
   const domain = TestUtil.getEmptyTestDomain();
   const task1 = TestUtil.getEmptySelectorTask("Test");
   const task2 = TestUtil.getEmptySelectorTask("Test2");
-  const task3 = new PrimitiveTask({ name: "Sub-task1" })
+  const task3 = new PrimitiveTask<TestContext>({ name: "Sub-task1" })
     .addCondition((context) => !context.hasState("HasA"));
-  const task4 = new PrimitiveTask({ name: "Sub-task2" });
+  const task4 = new PrimitiveTask<TestContext>({ name: "Sub-task2" });
 
   task3.setOperator((_context) => TaskStatus.Success);
   task3.addEffect(new Effect({
@@ -488,7 +489,7 @@ test("On Current Task Failed expected behavior ", () => {
   };
   const domain = TestUtil.getEmptyTestDomain();
   const task1 = TestUtil.getEmptySelectorTask("Test");
-  const task2 = new PrimitiveTask({ name: "Sub-task" });
+  const task2 = new PrimitiveTask<TestContext>({ name: "Sub-task" });
 
   task2.setOperator((_context) => TaskStatus.Failure);
   domain.add(domain.Root, task1);
@@ -511,7 +512,7 @@ test("On Current Task Continues expected behavior ", () => {
   };
   const domain = TestUtil.getEmptyTestDomain();
   const task1 = TestUtil.getEmptySelectorTask("Test");
-  const task2 = new PrimitiveTask({ name: "Sub-task" });
+  const task2 = new PrimitiveTask<TestContext>({ name: "Sub-task" });
 
   task2.setOperator((_context) => TaskStatus.Continue);
   domain.add(domain.Root, task1);
@@ -534,12 +535,12 @@ test("On Current Task Executing Condition Failed expected behavior ", () => {
   };
   const domain = TestUtil.getEmptyTestDomain();
   const task1 = TestUtil.getEmptySelectorTask("Test");
-  const task2 = new PrimitiveTask({ name: "Sub-task" });
+  const task2 = new PrimitiveTask<TestContext>({ name: "Sub-task" });
 
   task2.setOperator((_context) => TaskStatus.Continue);
   task2.addExecutingCondition({
     Name: "TestCondition",
-    func: (context) => context.Done,
+    func: (context) => context.hasState("Done"),
   });
   domain.add(domain.Root, task1);
   domain.add(task1, task2);
@@ -557,14 +558,14 @@ test("Planner replans when condition change invalidates current task", () => {
   const domain = TestUtil.getEmptyTestDomain();
   const select = TestUtil.getEmptySelectorTask("Test Select");
 
-  const actionA = new PrimitiveTask({ name: "Test Action A" });
-  actionA.addCondition((context) => context.Done === true);
-  actionA.addExecutingCondition({ Name: "Can choose A", func: (context) => context.Done === true });
+  const actionA = new PrimitiveTask<TestContext>({ name: "Test Action A" });
+  actionA.addCondition((context) => context.hasState("Done"));
+  actionA.addExecutingCondition({ Name: "Can choose A", func: (context) => context.hasState("Done") });
   actionA.setOperator(() => TaskStatus.Continue);
 
-  const actionB = new PrimitiveTask({ name: "Test Action B" });
-  actionB.addCondition((context) => context.Done === false);
-  actionB.addExecutingCondition({ Name: "Can not choose A", func: (context) => context.Done === false });
+  const actionB = new PrimitiveTask<TestContext>({ name: "Test Action B" });
+  actionB.addCondition((context) => !context.hasState("Done"));
+  actionB.addExecutingCondition({ Name: "Can not choose A", func: (context) => !context.hasState("Done") });
   actionB.setOperator(() => TaskStatus.Continue);
 
   domain.add(domain.Root, select);
@@ -581,7 +582,7 @@ test("Planner replans when condition change invalidates current task", () => {
   assert.is(ctx.MethodTraversalRecord[0], 0);
   assert.is(ctx.MethodTraversalRecord[1], 1);
 
-  ctx.Done = true;
+  ctx.setState("Done", true, false);
   ctx.IsDirty = true;
 
   planner.tick(domain, ctx, true);
@@ -603,11 +604,11 @@ test("Planner replans when world state change produces better plan", () => {
   const domain = TestUtil.getEmptyTestDomain();
   const select = TestUtil.getEmptySelectorTask("Test Select");
 
-  const actionA = new PrimitiveTask({ name: "Test Action A" });
+  const actionA = new PrimitiveTask<TestContext>({ name: "Test Action A" });
   actionA.addCondition((context) => context.getState("HasA") === 1);
   actionA.setOperator(() => TaskStatus.Continue);
 
-  const actionB = new PrimitiveTask({ name: "Test Action B" });
+  const actionB = new PrimitiveTask<TestContext>({ name: "Test Action B" });
   actionB.addCondition((context) => context.getState("HasA") === 0);
   actionB.setOperator(() => TaskStatus.Continue);
 
@@ -646,12 +647,12 @@ test("Planner replans when executing condition becomes invalid", () => {
   const domain = TestUtil.getEmptyTestDomain();
   const select = TestUtil.getEmptySelectorTask("Test Select");
 
-  const actionA = new PrimitiveTask({ name: "Test Action A" });
+  const actionA = new PrimitiveTask<TestContext>({ name: "Test Action A" });
   actionA.addCondition((context) => context.getState("HasA") === 0);
   actionA.addExecutingCondition({ Name: "Can choose A", func: (context) => context.getState("HasA") === 0 });
   actionA.setOperator(() => TaskStatus.Continue);
 
-  const actionB = new PrimitiveTask({ name: "Test Action B" });
+  const actionB = new PrimitiveTask<TestContext>({ name: "Test Action B" });
   actionB.addCondition((context) => context.getState("HasA") === 1);
   actionB.addExecutingCondition({ Name: "Can not choose A", func: (context) => context.getState("HasA") === 1 });
   actionB.setOperator(() => TaskStatus.Continue);
@@ -688,12 +689,12 @@ test("Planner toggles plans when executing conditions track world state", () => 
 
   ctx.init();
   const planner = new Planner();
-  const domain = new DomainBuilder("Test")
+  const domain = new DomainBuilder<TestContext>("Test")
     .action("A")
     .condition("Is True", (context) => context.hasState("HasA"))
     .executingCondition("Is True", (context) => context.hasState("HasA"))
     .do((context) => {
-      context.Done = true;
+      context.setState("Done", true, false);
       return TaskStatus.Continue;
     })
     .end()
@@ -701,7 +702,7 @@ test("Planner toggles plans when executing conditions track world state", () => 
     .condition("Is False", (context) => context.hasState("HasA") === false)
     .executingCondition("Is False", (context) => context.hasState("HasA") === false)
     .do((context) => {
-      context.Done = false;
+      context.setState("Done", false, false);
       return TaskStatus.Continue;
     })
     .end()
@@ -709,15 +710,15 @@ test("Planner toggles plans when executing conditions track world state", () => 
 
   ctx.setState("HasA", 1, true, EffectType.Permanent);
   planner.tick(domain, ctx);
-  assert.is(ctx.Done, true);
+  assert.is(ctx.hasState("Done"), true);
 
   ctx.setState("HasA", 0, true, EffectType.Permanent);
   planner.tick(domain, ctx);
-  assert.is(ctx.Done, false);
+  assert.is(ctx.hasState("Done", false), true);
 
   ctx.setState("HasA", 1, true, EffectType.Permanent);
   planner.tick(domain, ctx);
-  assert.is(ctx.Done, true);
+  assert.is(ctx.hasState("Done"), true);
 });
 
 test("Planner keeps current plan without executing conditions", () => {
@@ -725,18 +726,18 @@ test("Planner keeps current plan without executing conditions", () => {
 
   ctx.init();
   const planner = new Planner();
-  const domain = new DomainBuilder("Test")
+  const domain = new DomainBuilder<TestContext>("Test")
     .action("A")
     .condition("Is True", (context) => context.hasState("HasA"))
     .do((context) => {
-      context.Done = true;
+      context.setState("Done", true, false);
       return TaskStatus.Continue;
     })
     .end()
     .action("B")
     .condition("Is False", (context) => context.hasState("HasA") === false)
     .do((context) => {
-      context.Done = false;
+      context.setState("Done", false, false);
       return TaskStatus.Continue;
     })
     .end()
@@ -744,11 +745,11 @@ test("Planner keeps current plan without executing conditions", () => {
 
   ctx.setState("HasA", 1, true, EffectType.Permanent);
   planner.tick(domain, ctx);
-  assert.is(ctx.Done, true);
+  assert.is(ctx.hasState("Done"), true);
 
   ctx.setState("HasA", 0, true, EffectType.Permanent);
   planner.tick(domain, ctx);
-  assert.is(ctx.Done, true);
+  assert.is(ctx.hasState("Done"), true);
 });
 
 test("Planner can toggle plans when operator succeeds on invalid condition", () => {
@@ -756,7 +757,7 @@ test("Planner can toggle plans when operator succeeds on invalid condition", () 
 
   ctx.init();
   const planner = new Planner();
-  const domain = new DomainBuilder("Test")
+  const domain = new DomainBuilder<TestContext>("Test")
     .action("A")
     .condition("Is True", (context) => context.hasState("HasA"))
     .do((context) => {
@@ -764,7 +765,7 @@ test("Planner can toggle plans when operator succeeds on invalid condition", () 
         return TaskStatus.Success;
       }
 
-      context.Done = true;
+      context.setState("Done", true, false);
       return TaskStatus.Continue;
     })
     .end()
@@ -775,7 +776,7 @@ test("Planner can toggle plans when operator succeeds on invalid condition", () 
         return TaskStatus.Success;
       }
 
-      context.Done = false;
+      context.setState("Done", false, false);
       return TaskStatus.Continue;
     })
     .end()
@@ -783,15 +784,15 @@ test("Planner can toggle plans when operator succeeds on invalid condition", () 
 
   ctx.setState("HasA", 1, true, EffectType.Permanent);
   planner.tick(domain, ctx);
-  assert.is(ctx.Done, true);
+  assert.is(ctx.hasState("Done"), true);
 
   ctx.setState("HasA", 0, true, EffectType.Permanent);
   planner.tick(domain, ctx);
-  assert.is(ctx.Done, false);
+  assert.is(ctx.hasState("Done", false), true);
 
   ctx.setState("HasA", 1, true, EffectType.Permanent);
   planner.tick(domain, ctx);
-  assert.is(ctx.Done, true);
+  assert.is(ctx.hasState("Done"), true);
 });
 
 test("Planner fails to toggle when operator returns failure on invalid condition", () => {
@@ -799,7 +800,7 @@ test("Planner fails to toggle when operator returns failure on invalid condition
 
   ctx.init();
   const planner = new Planner();
-  const domain = new DomainBuilder("Test")
+  const domain = new DomainBuilder<TestContext>("Test")
     .action("A")
     .condition("Is True", (context) => context.hasState("HasA"))
     .do((context) => {
@@ -807,7 +808,7 @@ test("Planner fails to toggle when operator returns failure on invalid condition
         return TaskStatus.Failure;
       }
 
-      context.Done = true;
+      context.setState("Done", true, false);
       return TaskStatus.Continue;
     })
     .end()
@@ -818,7 +819,7 @@ test("Planner fails to toggle when operator returns failure on invalid condition
         return TaskStatus.Failure;
       }
 
-      context.Done = false;
+      context.setState("Done", false, false);
       return TaskStatus.Continue;
     })
     .end()
@@ -826,15 +827,15 @@ test("Planner fails to toggle when operator returns failure on invalid condition
 
   ctx.setState("HasA", 1, true, EffectType.Permanent);
   planner.tick(domain, ctx);
-  assert.is(ctx.Done, true);
+  assert.is(ctx.hasState("Done"), true);
 
   ctx.setState("HasA", 0, true, EffectType.Permanent);
   planner.tick(domain, ctx);
-  assert.is(ctx.Done, false);
+  assert.is(ctx.hasState("Done", false), true);
 
   ctx.setState("HasA", 1, true, EffectType.Permanent);
   planner.tick(domain, ctx);
-  assert.is(ctx.Done, true);
+  assert.is(ctx.hasState("Done"), true);
 });
 
 test.run();

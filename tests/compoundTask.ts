@@ -3,7 +3,9 @@ import log from "loglevel";
 import * as assert from "uvu/assert";
 
 import CompoundTask from "../src/Tasks/compoundTask";
-import Context from "../src/context";
+import TaskStatus from "../src/taskStatus";
+import * as TestUtil from "./utils";
+import type { TestContext } from "./utils";
 
 const prim = {
   name: "foo",
@@ -11,29 +13,32 @@ const prim = {
   effects: [],
   operator: () => {
     log.info("test");
+    return TaskStatus.Success;
   },
 };
 
 const prim2 = () => {
   log.info("primitive 2");
+  return TaskStatus.Success;
 };
 
 const compound = {
   name: "foo2",
-  type: "sequence",
+  type: "sequence" as const,
   conditions: [],
   effects: [],
   tasks: [
     prim,
     () => {
       log.info("test");
+      return TaskStatus.Success;
     },
     prim2,
   ],
 };
 
 test("Create a simple sequence of 3 primitive tasks", () => {
-  const task = new CompoundTask(compound);
+  const task = new CompoundTask<TestContext>(compound);
 
   assert.is(task.Name, "foo2");
   assert.is(task.Type, "sequence");
@@ -43,16 +48,19 @@ test("Create a simple sequence of 3 primitive tasks", () => {
 
 const compound2 = {
   name: "foo3",
-  type: "sequence",
+  type: "sequence" as const,
   conditions: [],
   effects: [],
-  tasks: () => {
-    log.info("test");
-  },
+  tasks: [
+    () => {
+      log.info("test");
+      return TaskStatus.Success;
+    },
+  ],
 };
 
 test("Create a compound task with only one anonymous primitive task", () => {
-  const task = new CompoundTask(compound2);
+  const task = new CompoundTask<TestContext>(compound2);
 
   assert.is(task.Name, "foo3");
   assert.is(task.Type, "sequence");
@@ -62,17 +70,20 @@ test("Create a compound task with only one anonymous primitive task", () => {
 
 const compound3 = {
   name: "Compound with conditions",
-  type: "sequence",
+  type: "sequence" as const,
   conditions: [() => true],
   effects: [],
-  tasks: () => {
-    log.info("test");
-  },
+  tasks: [
+    () => {
+      log.info("test");
+      return TaskStatus.Success;
+    },
+  ],
 };
 
 test("Create a compound task with one valid condition", () => {
-  const task = new CompoundTask(compound3);
-  const ctx = new Context();
+  const task = new CompoundTask<TestContext>(compound3);
+  const ctx = TestUtil.getEmptyTestContext();
 
   ctx.init();
 
@@ -85,17 +96,20 @@ test("Create a compound task with one valid condition", () => {
 
 const compound4 = {
   name: "Compound with conditions",
-  type: "select",
+  type: "select" as const,
   conditions: [() => true],
   effects: [],
-  tasks: () => {
-    log.info("test");
-  },
+  tasks: [
+    () => {
+      log.info("test");
+      return TaskStatus.Success;
+    },
+  ],
 };
 
 test("Create a compound task with one valid condition", () => {
-  const task = new CompoundTask(compound4);
-  const ctx = new Context();
+  const task = new CompoundTask<TestContext>(compound4);
+  const ctx = TestUtil.getEmptyTestContext();
 
   ctx.init();
 

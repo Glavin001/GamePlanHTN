@@ -444,7 +444,7 @@ test("GOAP dynamic costs respond to injury and vehicle state", () => {
 
   builder
     .goapAction("WalkToTarget", (context) => {
-      const from = context.getState("AgentNode");
+      const from = context.getState("AgentNode") as string;
       const meters = distance(from, targetNode);
       const injuryMultiplier = context.hasState("LegInjured") ? 2 : 1;
       return meters * injuryMultiplier;
@@ -462,7 +462,7 @@ test("GOAP dynamic costs respond to injury and vehicle state", () => {
       if (!hasVehicle) {
         return Number.POSITIVE_INFINITY;
       }
-      const from = context.getState("AgentNode");
+      const from = context.getState("AgentNode") as string;
       const meters = distance(from, targetNode);
       // driving is cheaper per meter
       return meters * 0.5;

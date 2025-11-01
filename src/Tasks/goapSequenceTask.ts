@@ -10,7 +10,7 @@ import PrimitiveTask from "./primitiveTask";
 interface GoapNode {
   cost: number;
   world: WorldState;
-  plan: PrimitiveTask[];
+  plan: PrimitiveTask<Context>[];
 }
 
 const expandChild = (
@@ -95,10 +95,10 @@ const snapshotWorldState = (context: Context): WorldState => {
     }
   }
 
-  const snapshot: WorldState = {};
+const snapshot: WorldState = {} as WorldState;
 
   for (const key of keys) {
-    snapshot[key] = context.getState(key);
+    snapshot[key] = context.getState(key) as number;
   }
 
   return snapshot;
