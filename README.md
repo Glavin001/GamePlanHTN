@@ -1,6 +1,6 @@
-# GamePlanHTN
+# HTN-AI
 
-A simple but powerful HTN planner written in TypeScript (and still consumable from JavaScript) based on the excellent work of [FluidHTN](https://github.com/ptrefall/fluid-hierarchical-task-network). There are several changes to the library to make it more idiomatic for the JS/TS ecosystem (these are detailed below.)
+A simple but powerful HTN planner written in TypeScript (and still consumable from JavaScript) forked from [GamePlanHTN](https://github.com/TotallyGatsby/GamePlanHTN) and based on the excellent work of [FluidHTN](https://github.com/ptrefall/fluid-hierarchical-task-network). There are several changes to the library to make it more idiomatic for the JS/TS ecosystem (these are detailed below.)
 
 > Portions of this project are derived from FluidHTN (MIT License) by Pål Trefall.
 
@@ -16,15 +16,15 @@ A simple but powerful HTN planner written in TypeScript (and still consumable fr
 * Early rejection of replanning that cannot be completed.
 * Extensible primitive operators, effects, and conditions including functional adapters.
 * Decomposition logging utilities for debugging.
-* 100% parity test coverage with FluidHTN plus additional regression tests for GamePlanHTN-specific features.
+* 100% parity test coverage with FluidHTN plus additional regression tests for HTN-AI-specific features.
 
 ## Installation
 
 ```bash
-npm install gameplan-htn
+npm install htn-ai
 ```
 
-GamePlanHTN targets Node.js 16+ (matching the active LTS releases). Bundled builds are published in both CommonJS and ES Module formats with type declarations.
+HTN-AI targets Node.js 16+ (matching the active LTS releases). Bundled builds are published in both CommonJS and ES Module formats with type declarations.
 
 
 # Library
@@ -35,7 +35,7 @@ GamePlanHTN targets Node.js 16+ (matching the active LTS releases). Bundled buil
 You can define a domain via plain data or use the fluent builder helpers. The builder is particularly convenient in TypeScript where editor IntelliSense surfaces task configuration options.
 
 ```ts
-import { DomainBuilder, TaskStatus } from "gameplan-htn";
+import { DomainBuilder, TaskStatus } from "htn-ai";
 
 const domain = DomainBuilder.begin("Example")
   .select("GetC", (getC) =>
@@ -84,7 +84,7 @@ Prefer the original JSON-style description? It continues to work and is still fu
 Defining a domain is done via a JavaScript object. Functions can be embedded directly into the domain definition, or passed into the domain later if you'd prefer to keep definitions strictly JSON.
 
 ```js
-import { Context, Domain, Planner, TaskStatus } from "gameplan-htn";
+import { Context, Domain, Planner, TaskStatus } from "htn-ai";
 import log from "loglevel";
 
 const domain = new Domain({
@@ -174,7 +174,7 @@ const domain = new Domain({
 A context is used to track our world state for the purposes of planning. A `Context` contains methods for setting/getting world state, and starts with a simple set of `getState()`, `setState()` and `hasState()` methods, but in most cases you will want to add functions to the Context object. (The legacy capitalized APIs are still available for compatibility with the original JavaScript samples.)
 
 There are a few significant changes from FluidHTN:
-1) GamePlanHTN uses object keys for world state rather than an array indexed by an enum, this simplifies finding worldstate to `context.WorldState.HasC` rather than `context.WorldState[(int)MyWorldState.HasC]`
+1) HTN-AI uses object keys for world state rather than an array indexed by an enum, this simplifies finding worldstate to `context.WorldState.HasC` rather than `context.WorldState[(int)MyWorldState.HasC]`
 1) The Context object's function set is mutable at runtime. You can assign functions directly to it at runtime, which means you do not necessarily need to subclass it for simple cases.
 
 ```js
@@ -211,7 +211,7 @@ while (!context.Done) {
 
 ### Slots and Functional Helpers
 
-GamePlanHTN implements FluidHTN's slot system for runtime plan splicing. Slots can be declared in your domain and filled with tasks at planning time.
+HTN-AI implements FluidHTN's slot system for runtime plan splicing. Slots can be declared in your domain and filled with tasks at planning time.
 
 The library also includes `FuncCondition` and `FuncOperator` adapters so you can reuse existing functions or lambdas while preserving context validation and type inference. Refer to the `tests/` folder for comprehensive examples that mirror the FluidHTN C# suite.
 

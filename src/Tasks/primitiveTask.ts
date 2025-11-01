@@ -6,8 +6,8 @@ import type CompoundTask from "./compoundTask";
 import FuncCondition, { type ConditionPredicate } from "../conditions/funcCondition";
 import FuncOperator from "../operators/funcOperator";
 
-export type TaskCondition = (context: Context) => boolean;
-export type ConditionLike = TaskCondition | FuncCondition;
+export type TaskCondition<TContext extends Context = Context> = (context: TContext) => boolean;
+export type ConditionLike<TContext extends Context = Context> = TaskCondition<TContext> | FuncCondition;
 
 export interface ExecutingCondition {
   Name: string;

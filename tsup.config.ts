@@ -6,7 +6,7 @@ export default defineConfig({
   dts: true,
   sourcemap: true,
   clean: true,
-  globalName: "GamePlanHTN",
+  globalName: "HtnAI",
   outDir: "dist",
   outExtension({ format }) {
     if (format === "cjs") {

@@ -1,7 +1,7 @@
 {
-  "name": "gameplan-htn",
-  "version": "1.0.1",
-  "description": "An easy to use hierarchical task planner (HTN) for JS. Based on FluidHTN.",
+  "name": "htn-ai",
+  "version": "1.1.0",
+  "description": "TypeScript Hierarchical Task Network (HTN) planner for game AI, inspired by FluidHTN",
   "type": "module",
   "source": "src/index.ts",
   "exports": {
@@ -26,12 +26,21 @@
     "url": "git+https://github.com/TotallyGatsby/GamePlanHTN.git"
   },
   "keywords": [
+    "htn",
+    "hierarchical-task-network",
+    "hierarchical task network",
+    "planner",
+    "planning",
     "game",
+    "game-ai",
+    "gamedev",
+    "typescript",
     "javascript",
     "ai",
-    "htn",
-    "planning",
-    "game-ai"
+    "ai behaviors",
+    "fluidhtn",
+    "fluid-htn",
+    "orchestration"
   ],
   "author": "Phill Spiess",
   "license": "MIT",
