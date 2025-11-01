@@ -5,8 +5,9 @@ import DomainBuilder from "./domainBuilder";
 import Effect from "./effect";
 import FuncCondition from "./conditions/funcCondition";
 import FuncOperator from "./operators/funcOperator";
+import TaskStatus from "./taskStatus";
 
-export { Domain, Context, Planner, DomainBuilder, Effect, FuncCondition, FuncOperator };
+export { Domain, Context, Planner, DomainBuilder, Effect, FuncCondition, FuncOperator, TaskStatus };
 
 export default {
   Domain,
@@ -16,4 +17,5 @@ export default {
   Effect,
   FuncCondition,
   FuncOperator,
+  TaskStatus,
 };
