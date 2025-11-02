@@ -13,7 +13,7 @@ const isValid = <TContext extends Context<WorldStateBase>>(context: TContext, ta
   }
 
   // A sequence with 0 children is not valid
-  if (task.Children.length === 0) {
+  if (task.getChildren(context).length === 0) {
     return false;
   }
 
@@ -28,6 +28,7 @@ const onDecomposeCompoundTask = <TContext extends Context<WorldStateBase>>(
   oldStackDepth: Record<string, number>,
   plan: PrimitiveTask<TContext>[],
   task: CompoundTask<TContext>,
+  children: CompoundTaskChild<TContext>[],
 ): PlanResult<TContext> => {
   if (context.LogDecomposition) {
     log.debug(`SequenceTask:OnDecomposeCompoundTask:Decomposing compound task: ${JSON.stringify(plan)}`);
@@ -55,7 +56,7 @@ const onDecomposeCompoundTask = <TContext extends Context<WorldStateBase>>(
       log.debug(`Sequence.OnDecomposeCompoundTask:Return partial plan at index ${taskIndex}!`);
     }
 
-    if (taskIndex < task.Children.length - 1) {
+    if (taskIndex < children.length - 1) {
       context.PartialPlanQueue.push({
         task,
         taskIndex: taskIndex + 1,
@@ -79,6 +80,7 @@ const onDecomposeTask = <TContext extends Context<WorldStateBase>>(
   oldStackDepth: Record<string, number>,
   plan: PrimitiveTask<TContext>[],
   task: CompoundTask<TContext>,
+  children: CompoundTaskChild<TContext>[],
 ): PlanResult<TContext> => {
   // If the task we're evaluating is invalid, return the existing plan as the result
   if (!childTask.isValid(context)) {
@@ -92,7 +94,7 @@ const onDecomposeTask = <TContext extends Context<WorldStateBase>>(
   }
 
   if (childTask instanceof CompoundTask) {
-    return onDecomposeCompoundTask(context, childTask, taskIndex, oldStackDepth, plan, task);
+    return onDecomposeCompoundTask(context, childTask, taskIndex, oldStackDepth, plan, task, children);
   } else if (childTask instanceof PrimitiveTask) {
     if (context.LogDecomposition) {
       log.debug(`Sequence.OnDecomposeTask:Adding primitive task to plan: ${childTask.Name}`);
@@ -133,15 +135,17 @@ const decompose = <TContext extends Context<WorldStateBase>>(context: TContext, 
 
   const oldStackDepth = context.getWorldStateChangeDepth();
 
-  for (let index = startIndex; index < task.Children.length; index++) {
-    const childTask = task.Children[index];
+  const children = task.getChildren(context);
+
+  for (let index = startIndex; index < children.length; index++) {
+    const childTask = children[index];
 
     if (context.LogDecomposition) {
       log.debug(`Sequence.OnDecompose:Task index: ${index}: ${childTask?.Name}`);
     }
 
     // Note: result and plan will be mutated by this function
-    result = onDecomposeTask(context, childTask, index, oldStackDepth, result.plan, task);
+    result = onDecomposeTask(context, childTask, index, oldStackDepth, result.plan, task, children);
 
     if (context.LogDecomposition) {
       log.debug(`Sequence.OnDecompose: Received Result: ${JSON.stringify(result)}`);

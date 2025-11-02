@@ -12,7 +12,7 @@ const isValid = <TContext extends Context<WorldStateBase>>(context: TContext, ta
   }
 
   // A sequence with 0 children is not valid
-  if (task.Children.length === 0) {
+  if (task.getChildren(context).length === 0) {
     return false;
   }
 
@@ -148,9 +148,11 @@ const decompose = <TContext extends Context<WorldStateBase>>(context: TContext, 
     status: DecompositionStatus.Rejected,
   };
 
-  for (let index = startIndex; index < task.Children.length; index++) {
+  const children = task.getChildren(context);
+
+  for (let index = startIndex; index < children.length; index++) {
     if (context.LogDecomposition) {
-      log.debug(`Selector.OnDecompose:Task index: ${index}: ${task.Children[index].Name}`);
+      log.debug(`Selector.OnDecompose:Task index: ${index}: ${children[index].Name}`);
     }
 
     // When we plan, we need to improve upon the previous MTR
@@ -162,7 +164,7 @@ const decompose = <TContext extends Context<WorldStateBase>>(context: TContext, 
       if (!beatsLastMTR(context, index, currentDecompositionIndex)) {
         context.MethodTraversalRecord.push(-1);
         if (context.DebugMTR) {
-          context.MTRDebug.push(`REPLAN FAIL ${task.Children[index].Name}`);
+          context.MTRDebug.push(`REPLAN FAIL ${children[index].Name}`);
         }
 
         if (context.LogDecomposition) {
@@ -180,7 +182,7 @@ const decompose = <TContext extends Context<WorldStateBase>>(context: TContext, 
       }
     }
 
-    const childTask = task.Children[index];
+    const childTask = children[index];
 
     // Note: result and plan will be mutated by this function
     result = onDecomposeTask(context, childTask, index, result.plan);

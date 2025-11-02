@@ -299,6 +299,38 @@ DomainBuilder.begin("Heist")
 
 Both features remain opt-in—existing domains continue to work unchanged. See `tests/utilitySelector.ts` and `tests/goapSequence.ts` for exhaustive coverage of scoring, tie-breaking, cycle avoidance, deterministic path selection, irrelevant-action pruning, and immediate-goal success scenarios.
 
+### Dynamic successor generation (HTN & GOAP)
+
+Complex worlds rarely expose every possible interaction up front. HTN-AI now lets you synthesize additional children at planning time with the fluent `.generate(generator)` (for any compound task) or `.goapGenerate(generator)` helpers. Generators receive the read-only planning context and return an array of task instances to consider alongside the statically declared children.
+
+- Static children keep their declaration order; generated children are appended deterministically and deduplicated by `Name` (first entry wins). This guarantees stable plans even when generators consult dynamic data.
+- HTN sequences, selectors, and utility selectors automatically call `task.getChildren(context)` during decomposition so dynamic subtasks participate transparently.
+- GOAP sequences treat generators as their successor function: each search node clones a virtual context, invokes all registered generators, filters the results to primitive or compound tasks, and blends them with the static list before expanding the lowest-cost node. The virtual world snapshot now records `string`, `number`, or `boolean` values, allowing richer predicates without manual casting.
+
+```ts
+DomainBuilder.begin("Logistics")
+  .sequence("Deliver Parcel")
+    .generate((context) => {
+      const tasks: PrimitiveTask[] = [];
+      const location = context.getState("AgentNode") as string;
+
+      for (const edge of lookupNeighbors(location)) {
+        tasks.push(createMovePrimitive(edge.from, edge.to, edge.cost));
+      }
+
+      if (location === context.getState("RecipientNode") && context.hasState("HasParcel", 1)) {
+        tasks.push(createDeliverPrimitive());
+      }
+
+      return tasks;
+    })
+    .action("Fallback - Request Help").do(() => TaskStatus.Success).end()
+  .end()
+  .end();
+```
+
+Because generators execute inside a planning-only clone, avoid mutating the provided context and keep edge costs non-negative so the GOAP search remains an admissible uniform-cost traversal. See `tests/dynamicSuccessors.ts` for real-world styled examples covering unlocked doors, local movement stencils, and deterministic deduplication.
+
 ## Development
 
 ```bash

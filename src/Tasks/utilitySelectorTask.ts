@@ -10,7 +10,7 @@ const isValid = (context: Context, task: CompoundTask): boolean => {
     return false;
   }
 
-  if (task.Children.length === 0) {
+  if (task.getChildren(context).length === 0) {
     return false;
   }
 
@@ -125,9 +125,11 @@ const decompose = (context: Context, startIndex: number, task: CompoundTask): Pl
   let bestChild: CompoundTaskChild | null = null;
   let bestScore = Number.NEGATIVE_INFINITY;
 
-  for (let index = startIndex; index < task.Children.length; index++) {
+  const children = task.getChildren(context);
+
+  for (let index = startIndex; index < children.length; index++) {
     if (context.LogDecomposition) {
-      log.debug(`UtilitySelector.OnDecompose:Task index: ${index}: ${task.Children[index].Name}`);
+      log.debug(`UtilitySelector.OnDecompose:Task index: ${index}: ${children[index].Name}`);
     }
 
     if (context?.LastMTR.length > 0 && context.MethodTraversalRecord.length < context.LastMTR.length) {
@@ -137,7 +139,7 @@ const decompose = (context: Context, startIndex: number, task: CompoundTask): Pl
         context.MethodTraversalRecord.push(-1);
 
         if (context.DebugMTR) {
-          context.MTRDebug.push(`REPLAN FAIL ${task.Children[index].Name}`);
+          context.MTRDebug.push(`REPLAN FAIL ${children[index].Name}`);
         }
 
         if (context.LogDecomposition) {
@@ -153,7 +155,7 @@ const decompose = (context: Context, startIndex: number, task: CompoundTask): Pl
       }
     }
 
-    const childTask = task.Children[index];
+    const childTask = children[index];
 
     if (!childTask.isValid(context)) {
       if (context.LogDecomposition) {
