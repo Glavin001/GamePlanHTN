@@ -177,15 +177,78 @@ const decompose = (context: Context, _startIndex: number, task: CompoundTask): P
 
   const visited = new Map<string, number>();
 
-  while (open.length > 0) {
-    let lowestIndex = 0;
+  const heuristic = task.getGoapHeuristic();
+  const heuristicWeightRaw = task.getGoapHeuristicWeight();
+  const heuristicWeight = Number.isFinite(heuristicWeightRaw) ? Math.max(1, heuristicWeightRaw) : 1;
+  const useHeuristic = typeof heuristic === "function";
+  let heuristicWarningLogged = false;
 
-    for (let i = 1; i < open.length; i++) {
-      if (open[i].cost < open[lowestIndex].cost) {
+  const logHeuristicIssue = (message: string): void => {
+    if (!heuristicWarningLogged && context.LogDecomposition) {
+      log.debug(message);
+    }
+    heuristicWarningLogged = true;
+  };
+
+  const evaluateHeuristic = (node: GoapNode): number => {
+    if (!useHeuristic) {
+      return 0;
+    }
+
+    let value: number;
+
+    try {
+      const virtualContext = createVirtualContext(context, node.world);
+      value = heuristic!(virtualContext, task.Goal!);
+    } catch (error) {
+      logHeuristicIssue(
+        `GOAPSequence.OnDecompose: Heuristic for task ${task.Name} threw an error (${String(error)}). Falling back to 0.`,
+      );
+
+      return 0;
+    }
+
+    if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+      logHeuristicIssue(
+        `GOAPSequence.OnDecompose: Heuristic for task ${task.Name} produced an invalid value (${value}). Falling back to 0.`,
+      );
+
+      return 0;
+    }
+
+    return value;
+  };
+
+  const scoreForNode = (node: GoapNode): number => {
+    if (!useHeuristic) {
+      return node.cost;
+    }
+
+    const h = evaluateHeuristic(node);
+    return node.cost + heuristicWeight * h;
+  };
+
+  const pickLowestNodeIndex = (nodes: GoapNode[]): number => {
+    let lowestIndex = 0;
+    let lowestScore = scoreForNode(nodes[0]);
+    let lowestCost = nodes[0].cost;
+
+    for (let i = 1; i < nodes.length; i++) {
+      const candidateScore = scoreForNode(nodes[i]);
+      const candidateCost = nodes[i].cost;
+
+      if (candidateScore < lowestScore || (candidateScore === lowestScore && candidateCost < lowestCost)) {
         lowestIndex = i;
+        lowestScore = candidateScore;
+        lowestCost = candidateCost;
       }
     }
 
+    return lowestIndex;
+  };
+
+  while (open.length > 0) {
+    const lowestIndex = pickLowestNodeIndex(open);
     const current = open.splice(lowestIndex, 1)[0];
     const worldKey = serializeWorld(current.world);
     const bestKnown = visited.get(worldKey);

@@ -1,3 +1,4 @@
+import { performance } from "node:perf_hooks";
 import { test } from "uvu";
 import * as assert from "uvu/assert";
 import Context from "../src/context";
@@ -505,6 +506,460 @@ test("GOAP dynamic costs respond to injury and vehicle state", () => {
   assert.equal(drivePlan.status, DecompositionStatus.Succeeded);
   assert.equal(drivePlan.plan.length, 1);
   assert.is(drivePlan.plan[0].Name, "DriveToTarget");
+});
+
+test("GOAP A* defaults to uniform cost when heuristic is absent", () => {
+  const builder = new DomainBuilder<Context>("GOAP Default Search");
+
+  builder.goapSequence("Reach Goal", { GoalMet: 1 });
+
+  builder
+    .goapAction("Shortcut", () => 5)
+    .condition("Missing goal", (context) => !context.hasState("GoalMet"))
+    .do(() => TaskStatus.Success)
+    .effect("Goal", EffectType.PlanOnly, (context, effectType) => {
+      context.setState("GoalMet", 1, false, effectType ?? EffectType.PlanOnly);
+    })
+  .end();
+
+  builder
+    .goapAction("Prepare", () => 2)
+    .condition("Unprepared", (context) => !context.hasState("Prepared"))
+    .do(() => TaskStatus.Success)
+    .effect("Mark prepared", EffectType.PlanOnly, (context, effectType) => {
+      context.setState("Prepared", 1, false, effectType ?? EffectType.PlanOnly);
+    })
+  .end();
+
+  builder
+    .goapAction("Finish", () => 2)
+    .condition("Prepared", (context) => context.hasState("Prepared"))
+    .condition("Missing goal", (context) => !context.hasState("GoalMet"))
+    .do(() => TaskStatus.Success)
+    .effect("Goal", EffectType.PlanOnly, (context, effectType) => {
+      context.setState("GoalMet", 1, false, effectType ?? EffectType.PlanOnly);
+    })
+  .end();
+
+  builder.end();
+
+  const domain = builder.build();
+  const ctx = new Context();
+  ctx.WorldState = { GoalMet: 0, Prepared: 0 };
+  ctx.init();
+
+  const { status, plan } = domain.findPlan(ctx);
+
+  assert.equal(status, DecompositionStatus.Succeeded);
+  assert.ok(plan);
+  assert.equal(plan.length, 2);
+  assert.is(plan[0].Name, "Prepare");
+  assert.is(plan[1].Name, "Finish");
+});
+
+test("GOAP admissible heuristic matches UCS plan", () => {
+  const baseline = new DomainBuilder<Context>("GOAP Baseline");
+  baseline.goapSequence("Reach Goal", { GoalMet: 1 });
+
+  baseline
+    .goapAction("Shortcut", () => 5)
+    .condition("Missing goal", (context) => !context.hasState("GoalMet"))
+    .do(() => TaskStatus.Success)
+    .effect("Goal", EffectType.PlanOnly, (context, effectType) => {
+      context.setState("GoalMet", 1, false, effectType ?? EffectType.PlanOnly);
+    })
+  .end();
+
+  baseline
+    .goapAction("Prepare", () => 2)
+    .condition("Unprepared", (context) => !context.hasState("Prepared"))
+    .do(() => TaskStatus.Success)
+    .effect("Mark prepared", EffectType.PlanOnly, (context, effectType) => {
+      context.setState("Prepared", 1, false, effectType ?? EffectType.PlanOnly);
+    })
+  .end();
+
+  baseline
+    .goapAction("Finish", () => 2)
+    .condition("Prepared", (context) => context.hasState("Prepared"))
+    .condition("Missing goal", (context) => !context.hasState("GoalMet"))
+    .do(() => TaskStatus.Success)
+    .effect("Goal", EffectType.PlanOnly, (context, effectType) => {
+      context.setState("GoalMet", 1, false, effectType ?? EffectType.PlanOnly);
+    })
+  .end();
+
+  baseline.end();
+
+  const heuristicBuilder = new DomainBuilder<Context>("GOAP AStar");
+  heuristicBuilder.goapSequence("Reach Goal", { GoalMet: 1 });
+
+  heuristicBuilder
+    .goapAction("Shortcut", () => 5)
+    .condition("Missing goal", (context) => !context.hasState("GoalMet"))
+    .do(() => TaskStatus.Success)
+    .effect("Goal", EffectType.PlanOnly, (context, effectType) => {
+      context.setState("GoalMet", 1, false, effectType ?? EffectType.PlanOnly);
+    })
+  .end();
+
+  heuristicBuilder
+    .goapAction("Prepare", () => 2)
+    .condition("Unprepared", (context) => !context.hasState("Prepared"))
+    .do(() => TaskStatus.Success)
+    .effect("Mark prepared", EffectType.PlanOnly, (context, effectType) => {
+      context.setState("Prepared", 1, false, effectType ?? EffectType.PlanOnly);
+    })
+  .end();
+
+  heuristicBuilder
+    .goapAction("Finish", () => 2)
+    .condition("Prepared", (context) => context.hasState("Prepared"))
+    .condition("Missing goal", (context) => !context.hasState("GoalMet"))
+    .do(() => TaskStatus.Success)
+    .effect("Goal", EffectType.PlanOnly, (context, effectType) => {
+      context.setState("GoalMet", 1, false, effectType ?? EffectType.PlanOnly);
+    })
+  .end();
+
+  heuristicBuilder.goapHeuristic((context, _goal) => {
+    if (context.hasState("GoalMet")) {
+      return 0;
+    }
+
+    if (context.hasState("Prepared")) {
+      return 2;
+    }
+
+    return 4;
+  });
+
+  heuristicBuilder.end();
+
+  const baselineDomain = baseline.build();
+  const heuristicDomain = heuristicBuilder.build();
+
+  const baselineContext = new Context();
+  baselineContext.WorldState = { GoalMet: 0, Prepared: 0 };
+  baselineContext.init();
+
+  const heuristicContext = new Context();
+  heuristicContext.WorldState = { GoalMet: 0, Prepared: 0 };
+  heuristicContext.init();
+
+  const baselinePlan = baselineDomain.findPlan(baselineContext);
+  const heuristicPlan = heuristicDomain.findPlan(heuristicContext);
+
+  assert.equal(baselinePlan.status, DecompositionStatus.Succeeded);
+  assert.equal(heuristicPlan.status, DecompositionStatus.Succeeded);
+  assert.equal(baselinePlan.plan.length, heuristicPlan.plan.length);
+  assert.equal(
+    baselinePlan.plan.map((task) => task.Name).join(","),
+    heuristicPlan.plan.map((task) => task.Name).join(","),
+  );
+});
+
+test("GOAP weighted A* may return a more expensive plan", () => {
+  const builder = new DomainBuilder<Context>("GOAP Weighted");
+
+  builder.goapSequence("Reach Goal", { GoalMet: 1 });
+
+  builder
+    .goapAction("Shortcut", () => 5)
+    .condition("Missing goal", (context) => !context.hasState("GoalMet"))
+    .do(() => TaskStatus.Success)
+    .effect("Goal", EffectType.PlanOnly, (context, effectType) => {
+      context.setState("GoalMet", 1, false, effectType ?? EffectType.PlanOnly);
+    })
+  .end();
+
+  builder
+    .goapAction("Prepare", () => 2)
+    .condition("Unprepared", (context) => !context.hasState("Prepared"))
+    .do(() => TaskStatus.Success)
+    .effect("Mark prepared", EffectType.PlanOnly, (context, effectType) => {
+      context.setState("Prepared", 1, false, effectType ?? EffectType.PlanOnly);
+    })
+  .end();
+
+  builder
+    .goapAction("Finish", () => 2)
+    .condition("Prepared", (context) => context.hasState("Prepared"))
+    .condition("Missing goal", (context) => !context.hasState("GoalMet"))
+    .do(() => TaskStatus.Success)
+    .effect("Goal", EffectType.PlanOnly, (context, effectType) => {
+      context.setState("GoalMet", 1, false, effectType ?? EffectType.PlanOnly);
+    })
+  .end();
+
+  builder.goapHeuristic((context, _goal) => {
+    if (context.hasState("GoalMet")) {
+      return 0;
+    }
+
+    if (context.hasState("Prepared")) {
+      return 2;
+    }
+
+    return 4;
+  });
+
+  builder.goapHeuristicWeight(2);
+
+  builder.end();
+
+  const domain = builder.build();
+  const ctx = new Context();
+  ctx.WorldState = { GoalMet: 0, Prepared: 0 };
+  ctx.init();
+
+  const result = domain.findPlan(ctx);
+
+  assert.equal(result.status, DecompositionStatus.Succeeded);
+  assert.ok(result.plan);
+  assert.equal(result.plan.length, 1);
+  assert.is(result.plan[0].Name, "Shortcut");
+});
+
+test("GOAP heuristic falling back from NaN or negative values", () => {
+  const baselineBuilder = new DomainBuilder<Context>("GOAP Safe Baseline");
+  baselineBuilder.goapSequence("Reach Goal", { GoalMet: 1 });
+
+  baselineBuilder
+    .goapAction("StepOne")
+    .condition("Missing goal", (context) => !context.hasState("GoalMet"))
+    .do(() => TaskStatus.Success)
+    .effect("Progress", EffectType.PlanOnly, (context, effectType) => {
+      context.setState("Progress", 1, false, effectType ?? EffectType.PlanOnly);
+    })
+  .end();
+
+  baselineBuilder
+    .goapAction("StepTwo")
+    .condition("Progress", (context) => context.hasState("Progress"))
+    .do(() => TaskStatus.Success)
+    .effect("Goal", EffectType.PlanOnly, (context, effectType) => {
+      context.setState("GoalMet", 1, false, effectType ?? EffectType.PlanOnly);
+    })
+  .end();
+
+  baselineBuilder.end();
+
+  const heuristicBuilder = new DomainBuilder<Context>("GOAP Unsafe Heuristic");
+  heuristicBuilder.goapSequence("Reach Goal", { GoalMet: 1 });
+
+  heuristicBuilder
+    .goapAction("StepOne")
+    .condition("Missing goal", (context) => !context.hasState("GoalMet"))
+    .do(() => TaskStatus.Success)
+    .effect("Progress", EffectType.PlanOnly, (context, effectType) => {
+      context.setState("Progress", 1, false, effectType ?? EffectType.PlanOnly);
+    })
+  .end();
+
+  heuristicBuilder
+    .goapAction("StepTwo")
+    .condition("Progress", (context) => context.hasState("Progress"))
+    .do(() => TaskStatus.Success)
+    .effect("Goal", EffectType.PlanOnly, (context, effectType) => {
+      context.setState("GoalMet", 1, false, effectType ?? EffectType.PlanOnly);
+    })
+  .end();
+
+  heuristicBuilder.goapHeuristic((context, _goal) => {
+    if (context.hasState("GoalMet")) {
+      return -1;
+    }
+
+    if (context.hasState("Progress")) {
+      return Number.NaN;
+    }
+
+    return Number.POSITIVE_INFINITY;
+  });
+
+  heuristicBuilder.end();
+
+  const baselineDomain = baselineBuilder.build();
+  const heuristicDomain = heuristicBuilder.build();
+
+  const baselineContext = new Context();
+  baselineContext.WorldState = { GoalMet: 0, Progress: 0 };
+  baselineContext.init();
+
+  const heuristicContext = new Context();
+  heuristicContext.WorldState = { GoalMet: 0, Progress: 0 };
+  heuristicContext.init();
+
+  const baselinePlan = baselineDomain.findPlan(baselineContext);
+  const heuristicPlan = heuristicDomain.findPlan(heuristicContext);
+
+  assert.equal(baselinePlan.status, DecompositionStatus.Succeeded);
+  assert.equal(heuristicPlan.status, DecompositionStatus.Succeeded);
+  assert.equal(
+    baselinePlan.plan.map((task) => task.Name).join(","),
+    heuristicPlan.plan.map((task) => task.Name).join(","),
+  );
+});
+
+test("GOAP heuristic maintains deterministic tie-breaking", () => {
+  const builder = new DomainBuilder<Context>("GOAP Deterministic Heuristic");
+
+  builder.goapSequence("Reach Goal", { GoalMet: 1 });
+
+  builder
+    .goapAction("StartPathA")
+    .do(() => TaskStatus.Success)
+    .effect("StageA", EffectType.PlanOnly, (context, effectType) => {
+      context.setState("StageA", 1, false, effectType ?? EffectType.PlanOnly);
+    })
+  .end();
+
+  builder
+    .goapAction("FinishPathA")
+    .condition("Has StageA", (context) => context.hasState("StageA"))
+    .do(() => TaskStatus.Success)
+    .effect("Goal", EffectType.PlanOnly, (context, effectType) => {
+      context.setState("GoalMet", 1, false, effectType ?? EffectType.PlanOnly);
+    })
+  .end();
+
+  builder
+    .goapAction("StartPathB")
+    .do(() => TaskStatus.Success)
+    .effect("StageB", EffectType.PlanOnly, (context, effectType) => {
+      context.setState("StageB", 1, false, effectType ?? EffectType.PlanOnly);
+    })
+  .end();
+
+  builder
+    .goapAction("FinishPathB")
+    .condition("Has StageB", (context) => context.hasState("StageB"))
+    .do(() => TaskStatus.Success)
+    .effect("Goal", EffectType.PlanOnly, (context, effectType) => {
+      context.setState("GoalMet", 1, false, effectType ?? EffectType.PlanOnly);
+    })
+  .end();
+
+  builder.goapHeuristic((_context, _goal) => 1);
+
+  builder.end();
+
+  const domain = builder.build();
+  const ctx = new Context();
+  ctx.WorldState = { GoalMet: 0, StageA: 0, StageB: 0 };
+  ctx.init();
+
+  const plan = domain.findPlan(ctx);
+
+  assert.equal(plan.status, DecompositionStatus.Succeeded);
+  assert.ok(plan.plan);
+  assert.equal(plan.plan.length, 2);
+  assert.is(plan.plan[0].Name, "StartPathA");
+  assert.is(plan.plan[1].Name, "FinishPathA");
+});
+
+test("GOAP heuristic smoke test on branching domain", () => {
+  const buildDomain = (withHeuristic: boolean): DomainBuilder<Context> => {
+    const builder = new DomainBuilder<Context>(`GOAP Branching ${withHeuristic ? "A*" : "UCS"}`);
+    builder.goapSequence("Collect Items", { HasGem: 1, HasKey: 1 });
+
+    builder
+      .goapAction("CollectGem", () => 3)
+      .condition("Missing gem", (context) => !context.hasState("HasGem"))
+      .do(() => TaskStatus.Success)
+      .effect("Gem", EffectType.PlanOnly, (context, effectType) => {
+        context.setState("HasGem", 1, false, effectType ?? EffectType.PlanOnly);
+      })
+    .end();
+
+    builder
+      .goapAction("CollectKey", () => 2)
+      .condition("Missing key", (context) => !context.hasState("HasKey"))
+      .do(() => TaskStatus.Success)
+      .effect("Key", EffectType.PlanOnly, (context, effectType) => {
+        context.setState("HasKey", 1, false, effectType ?? EffectType.PlanOnly);
+      })
+    .end();
+
+    builder
+      .goapAction("TalkToNPC", () => 1)
+      .condition("Not met", (context) => !context.hasState("MetNPC"))
+      .do(() => TaskStatus.Success)
+      .effect("MetNPC", EffectType.PlanOnly, (context, effectType) => {
+        context.setState("MetNPC", 1, false, effectType ?? EffectType.PlanOnly);
+      })
+    .end();
+
+    builder
+      .goapAction("TradeForGem", () => 2)
+      .condition("Met NPC", (context) => context.hasState("MetNPC"))
+      .condition("Missing gem", (context) => !context.hasState("HasGem"))
+      .do(() => TaskStatus.Success)
+      .effect("Gem", EffectType.PlanOnly, (context, effectType) => {
+        context.setState("HasGem", 1, false, effectType ?? EffectType.PlanOnly);
+      })
+    .end();
+
+    builder
+      .goapAction("SearchChest", () => 4)
+      .condition("Missing key", (context) => !context.hasState("HasKey"))
+      .do(() => TaskStatus.Success)
+      .effect("Key", EffectType.PlanOnly, (context, effectType) => {
+        context.setState("HasKey", 1, false, effectType ?? EffectType.PlanOnly);
+      })
+    .end();
+
+    if (withHeuristic) {
+      builder.goapHeuristic((context, goal) => {
+        let missing = 0;
+        for (const [key, value] of Object.entries(goal)) {
+          if ((context.getState(key as never) as number) !== value) {
+            missing += 1;
+          }
+        }
+
+        return missing;
+      });
+    }
+
+    builder.end();
+    return builder;
+  };
+
+  const baselineDomain = buildDomain(false).build();
+  const heuristicDomain = buildDomain(true).build();
+
+  const createContext = (): Context => {
+    const ctx = new Context();
+    ctx.WorldState = {
+      HasGem: 0,
+      HasKey: 0,
+      MetNPC: 0,
+    };
+    ctx.init();
+    return ctx;
+  };
+
+  const baselineContext = createContext();
+  const heuristicContext = createContext();
+
+  const baselineStart = performance.now();
+  const baselinePlan = baselineDomain.findPlan(baselineContext);
+  const baselineDuration = performance.now() - baselineStart;
+
+  const heuristicStart = performance.now();
+  const heuristicPlan = heuristicDomain.findPlan(heuristicContext);
+  const heuristicDuration = performance.now() - heuristicStart;
+
+  assert.equal(baselinePlan.status, DecompositionStatus.Succeeded);
+  assert.equal(heuristicPlan.status, DecompositionStatus.Succeeded);
+  assert.equal(
+    baselinePlan.plan.map((task) => task.Name).join(","),
+    heuristicPlan.plan.map((task) => task.Name).join(","),
+  );
+  assert.ok(Number.isFinite(baselineDuration));
+  assert.ok(Number.isFinite(heuristicDuration));
 });
 
 test.run();

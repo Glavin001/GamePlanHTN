@@ -113,6 +113,30 @@ class DomainBuilder<TContext extends Context<WorldStateBase> = Context> {
     return this;
   }
 
+  goapHeuristic(heuristic: (context: TContext, goal: Record<string, number>) => number): this {
+    const pointer = this.ensureCompoundPointer();
+
+    if (pointer.Type !== "goap_sequence") {
+      throw new Error("goapHeuristic can only be used inside a GOAP sequence task");
+    }
+
+    pointer.setGoapHeuristic(heuristic);
+
+    return this;
+  }
+
+  goapHeuristicWeight(weight: number): this {
+    const pointer = this.ensureCompoundPointer();
+
+    if (pointer.Type !== "goap_sequence") {
+      throw new Error("goapHeuristicWeight can only be used inside a GOAP sequence task");
+    }
+
+    pointer.setGoapHeuristicWeight(weight);
+
+    return this;
+  }
+
   cost(costFn: (context: TContext) => number): this {
     const pointer = this.pointer;
 
