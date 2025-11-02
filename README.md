@@ -301,16 +301,16 @@ Both features remain opt-in—existing domains continue to work unchanged. See `
 
 ### Dynamic successor generation (HTN & GOAP)
 
-Complex worlds rarely expose every possible interaction up front. HTN-AI now lets you synthesize additional children at planning time with the fluent `.generate(generator)` (for any compound task) or `.goapGenerate(generator)` helpers. Generators receive the read-only planning context and return an array of task instances to consider alongside the statically declared children.
+Complex worlds rarely expose every possible interaction up front. HTN-AI now lets you synthesize additional children at planning time with the fluent `.generate(generator)` (for any compound task) or `.goapGenerate(generator)` helpers. Generators receive an object containing the read-only planning context and return an array of task instances to consider alongside the statically declared children.
 
 - Static children keep their declaration order; generated children are appended deterministically and deduplicated by `Name` (first entry wins). This guarantees stable plans even when generators consult dynamic data.
 - HTN sequences, selectors, and utility selectors automatically call `task.getChildren(context)` during decomposition so dynamic subtasks participate transparently.
-- GOAP sequences treat generators as their successor function: each search node clones a virtual context, invokes all registered generators, filters the results to primitive or compound tasks, and blends them with the static list before expanding the lowest-cost node. The virtual world snapshot now records `string`, `number`, or `boolean` values, allowing richer predicates without manual casting.
+- GOAP sequences treat generators as their successor function: each search node clones a virtual context, invokes all registered generators, filters the results to primitive or compound tasks, and blends them with the static list before expanding the lowest-cost node. The virtual world snapshot now clones `WorldStateBase` values as-is, allowing richer predicates without manual casting.
 
 ```ts
 DomainBuilder.begin("Logistics")
   .sequence("Deliver Parcel")
-    .generate((context) => {
+    .generate(({ context }) => {
       const tasks: PrimitiveTask[] = [];
       const location = context.getState("AgentNode") as string;
 

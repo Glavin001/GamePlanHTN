@@ -99,7 +99,7 @@ test("HTN dynamic generator produces contextual subtasks", () => {
   const builder = new DomainBuilder<Context>("Dynamic HTN");
 
   builder.sequence("Root");
-  builder.generate((context) => {
+  builder.generate(({ context }) => {
     if (context.hasState("ShouldDoDynamic", 1)) {
       return [
         new PrimitiveTask<Context>({
@@ -140,7 +140,7 @@ test("GOAP dynamic generators unlock new successors mid-plan", () => {
   const builder = new DomainBuilder<Context>("Dynamic GOAP");
 
   builder.goapSequence("Deliver", { Delivered: 1 });
-  builder.goapGenerate((context) => {
+  builder.goapGenerate(({ context }) => {
     const position = context.getState("AgentPos") as string;
     const tasks: PrimitiveTask<Context>[] = [];
 
@@ -155,7 +155,7 @@ test("GOAP dynamic generators unlock new successors mid-plan", () => {
     return tasks;
   });
 
-  builder.goapGenerate((context) => {
+  builder.goapGenerate(({ context }) => {
     const tasks: PrimitiveTask<Context>[] = [];
     const position = context.getState("AgentPos") as string;
 
@@ -196,7 +196,7 @@ test("GOAP dynamic generators dedupe names after static children", () => {
     })
     .end();
 
-  builder.goapGenerate((context) => {
+  builder.goapGenerate(({ context }) => {
     if (context.getState("AgentPos") === "A") {
       return [createMovePrimitive("A", "B", 1), createDeliver("B")];
     }

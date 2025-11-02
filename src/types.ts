@@ -1,4 +1,4 @@
-import type CompoundTask, { type CompoundTaskChild } from "./Tasks/compoundTask";
+import type { CompoundTaskChild } from "./Tasks/compoundTask";
 import type PrimitiveTask from "./Tasks/primitiveTask";
 import type { DecompositionStatusValue } from "./decompositionStatus";
 import type Context from "./context";
@@ -9,6 +9,10 @@ export interface PlanResult<TContext extends Context<WorldStateBase> = Context> 
   status: DecompositionStatusValue;
 }
 
+export interface SuccessorGeneratorArgs<TContext extends Context<WorldStateBase> = Context> {
+  context: TContext;
+}
+
 export type SuccessorGenerator<TContext extends Context<WorldStateBase> = Context> = (
-  context: TContext,
+  args: SuccessorGeneratorArgs<TContext>,
 ) => CompoundTaskChild<TContext>[] | readonly CompoundTaskChild<TContext>[];

@@ -199,7 +199,7 @@ class CompoundTask<TContext extends Context = Context> {
         let generated: CompoundTaskChild<TContext>[] | readonly CompoundTaskChild<TContext>[];
 
         try {
-          generated = generator(context) ?? [];
+          generated = generator({ context }) ?? [];
         } catch (error) {
           log.warn(`Compound task ${this.Name} dynamic generator threw an error.`, error);
           continue;
