@@ -12,6 +12,7 @@ import {
   DoInParallel,
   Perform,
   WhileConditionHolds,
+  WithOperators,
   withOperators,
   applyExecutingConditions,
   compileGoalProgram,
@@ -648,28 +649,6 @@ const createOperator = (
 const seconds = (value: number): number => value;
 const minutes = (value: number): number => value * 60;
 
-const pushConstraints = (constraints: NavigationConstraints): OperatorSpec<ScenarioContext> =>
-  createOperator(
-    "Push Constraints",
-    (context) => {
-      context.pushConstraints(constraints);
-      return TaskStatus.Success;
-    },
-    {
-      abort: (context) => {
-        context.popConstraints();
-      },
-      forceStop: (context) => {
-        context.popConstraints();
-      },
-    },
-  );
-
-const popConstraints = createOperator("Pop Constraints", (context) => {
-  context.popConstraints();
-  return TaskStatus.Success;
-});
-
 const pushDeadline = (deadlineSeconds: number): OperatorSpec<ScenarioContext> =>
   createOperator(
     "Push Deadline",
@@ -923,6 +902,101 @@ const speak = (message: string): GoalProgram => new Perform("speak", { message }
 
 const completeProgram = (): GoalProgram => new Perform("completeProgram", {}, "Mark Program Complete");
 
+const mergeConstraintPayload = (
+  current: NavigationConstraints | NavigationConstraintsInit | null | undefined,
+  scope: NavigationConstraints,
+): NavigationConstraints => {
+  const base = current ? toNavigationConstraints(current) : new NavigationConstraints();
+  return base.mergeIn(scope);
+};
+
+const decoratePerformWithConstraints = (
+  perform: Perform,
+  scope: NavigationConstraints,
+): GoalProgram => {
+  switch (perform.action) {
+    case "moveToRegion": {
+      const payload = perform.payload as {
+        region: string;
+        constraints?: NavigationConstraints | NavigationConstraintsInit | null;
+      };
+      const merged = mergeConstraintPayload(payload.constraints ?? null, scope);
+      return new Perform(
+        perform.action,
+        { ...payload, constraints: merged },
+        perform.label,
+      );
+    }
+    case "followEntity": {
+      const payload = perform.payload as {
+        entityId: string;
+        radius: number;
+        constraints?: NavigationConstraints | NavigationConstraintsInit | null;
+      };
+      const merged = mergeConstraintPayload(payload.constraints ?? null, scope);
+      return new Perform(
+        perform.action,
+        { ...payload, constraints: merged },
+        perform.label,
+      );
+    }
+    case "moveAwayFrom": {
+      const payload = perform.payload as {
+        entityId: string;
+        distance: number;
+        constraints?: NavigationConstraints | NavigationConstraintsInit | null;
+      };
+      const merged = mergeConstraintPayload(payload.constraints ?? null, scope);
+      return new Perform(
+        perform.action,
+        { ...payload, constraints: merged },
+        perform.label,
+      );
+    }
+    default:
+      return perform;
+  }
+};
+
+const decorateGoalProgramWithConstraints = (
+  program: GoalProgram,
+  scope: NavigationConstraints,
+): GoalProgram => {
+  if (program instanceof DoInOrder) {
+    return new DoInOrder(
+      program.steps.map((step) => decorateGoalProgramWithConstraints(step, scope)),
+      program.label,
+    );
+  }
+
+  if (program instanceof DoInParallel) {
+    return new DoInParallel(
+      program.branches.map((branch) => decorateGoalProgramWithConstraints(branch, scope)),
+      program.label,
+    );
+  }
+
+  if (program instanceof WhileConditionHolds) {
+    return new WhileConditionHolds(program.condition, decorateGoalProgramWithConstraints(program.subgoal, scope));
+  }
+
+  if (program instanceof WithOperators) {
+    return new WithOperators(
+      program.label,
+      program.enter,
+      decorateGoalProgramWithConstraints(program.subgoal, scope),
+      program.exit,
+      program.executingConditions,
+    );
+  }
+
+  if (program instanceof Perform) {
+    return decoratePerformWithConstraints(program, scope);
+  }
+
+  return program;
+};
+
 const applyNavigationConstraints = (
   constraints: NavigationConstraints | NavigationConstraintsInit,
   subgoal: GoalProgram,
@@ -930,11 +1004,12 @@ const applyNavigationConstraints = (
   options: { guards?: ExecutingConditionSpec<ScenarioContext>[] } = {},
 ): GoalProgram => {
   const scope = toNavigationConstraints(constraints);
+  const decoratedSubgoal = decorateGoalProgramWithConstraints(subgoal, scope);
   const guards = [
     ...(scope.keepWithinRegion ? [insideRegionCondition(scope.keepWithinRegion)] : []),
     ...(options.guards ?? []),
   ];
-  return withOperators<ScenarioContext>(label, [pushConstraints(scope)], subgoal, [popConstraints], guards);
+  return withOperators<ScenarioContext>(label, [], decoratedSubgoal, [], guards);
 };
 
 const withActionConstraints = (
@@ -1028,11 +1103,32 @@ const scenarioHandlers: GoalCompilationHandlers<ScenarioContext> = {
         return;
       }
       case "followEntity": {
-        const { entityId, radius } = action.payload as { entityId: string; radius: number };
-        builder.action(action.label ?? `Follow ${entityId}`)
-          .do(followEntityOperator(entityId, radius));
-        applyExecutingConditions(builder, executingConditions.concat([withinRadiusCondition(entityId, radius)]));
-        builder.end();
+        const { entityId, radius, constraints } = action.payload as {
+          entityId: string;
+          radius: number;
+          constraints?: NavigationConstraints | NavigationConstraintsInit | null;
+        };
+        const baseConditions = executingConditions.concat([withinRadiusCondition(entityId, radius)]);
+        if (constraints) {
+          const scope = toNavigationConstraints(constraints);
+          const losTarget = scope.requireLineOfSightTo ?? scope.preferLineOfSightTo;
+          const regionGuard = scope.keepWithinRegion ? [insideRegionCondition(scope.keepWithinRegion)] : [];
+          const actionConditions = baseConditions.concat([
+            ...regionGuard,
+            ...(losTarget ? [lineOfSightCondition(losTarget)] : []),
+          ]);
+          const scopedOp = scopedConstraintOperator(scope, followEntityOperator(entityId, radius));
+          builder
+            .action(action.label ?? `Follow ${entityId}`)
+            .do(scopedOp.operation, scopedOp.forceStop, scopedOp.abort);
+          applyExecutingConditions(builder, actionConditions);
+          builder.end();
+        } else {
+          builder.action(action.label ?? `Follow ${entityId}`)
+            .do(followEntityOperator(entityId, radius));
+          applyExecutingConditions(builder, baseConditions);
+          builder.end();
+        }
         return;
       }
       case "holdPosition": {
@@ -1042,11 +1138,31 @@ const scenarioHandlers: GoalCompilationHandlers<ScenarioContext> = {
         return;
       }
       case "moveAwayFrom": {
-        const { entityId, distance } = action.payload as { entityId: string; distance: number };
-        builder.action(action.label ?? `Move Away From ${entityId}`)
-          .do(moveAwayFromOperator(entityId, distance));
-        applyExecutingConditions(builder, executingConditions);
-        builder.end();
+        const { entityId, distance, constraints } = action.payload as {
+          entityId: string;
+          distance: number;
+          constraints?: NavigationConstraints | NavigationConstraintsInit | null;
+        };
+        if (constraints) {
+          const scope = toNavigationConstraints(constraints);
+          const losTarget = scope.requireLineOfSightTo ?? scope.preferLineOfSightTo;
+          const regionGuard = scope.keepWithinRegion ? [insideRegionCondition(scope.keepWithinRegion)] : [];
+          const actionConditions = executingConditions.concat([
+            ...regionGuard,
+            ...(losTarget ? [lineOfSightCondition(losTarget)] : []),
+          ]);
+          const scopedOp = scopedConstraintOperator(scope, moveAwayFromOperator(entityId, distance));
+          builder
+            .action(action.label ?? `Move Away From ${entityId}`)
+            .do(scopedOp.operation, scopedOp.forceStop, scopedOp.abort);
+          applyExecutingConditions(builder, actionConditions);
+          builder.end();
+        } else {
+          builder.action(action.label ?? `Move Away From ${entityId}`)
+            .do(moveAwayFromOperator(entityId, distance));
+          applyExecutingConditions(builder, executingConditions);
+          builder.end();
+        }
         return;
       }
       case "speak": {
@@ -1293,11 +1409,77 @@ test("constraint scope cleans up when subgoal aborts", () => {
     world.advance(0.1);
   }
 
-  assert.ok(context.constraintDepth <= 2, "constraint stack should unwind after abort");
+  assert.is(context.constraintDepth, 1, "constraint stack should unwind after abort");
   assert.not(context.messages.includes("Unreachable"), "fallback action should not execute when move fails");
 });
 
-test("navigation constraint wrapper emits push/pop actions", () => {
+test("nested constraint scopes clean up on inner abort", () => {
+  const world = new DemoWorld();
+  world.advance(3.5); // ensure guide_bot line of sight is lost for inner scope
+  const navigation = new DemoNavigationPlanner(world);
+  const context = new ScenarioContext(world, navigation);
+  context.init();
+
+  const program = new DoInOrder([
+    applyNavigationConstraints(
+      { keepWithinRegion: "east_corridor" },
+      withActionConstraints({ requireLineOfSightTo: "guide_bot" }, moveToRegion("dock_a")),
+      "Outer Corridor Scope",
+    ),
+    completeProgram(),
+  ]);
+
+  const domain = compileGoalProgram<ScenarioContext>("NestedConstraintAbort", program, scenarioHandlers);
+  const planner = new Planner<ScenarioContext>();
+
+  for (let ticks = 0; ticks < 30; ticks += 1) {
+    planner.tick(domain, context);
+    world.advance(0.1);
+  }
+
+  assert.is(context.constraintDepth, 1, "nested scopes should unwind after inner abort");
+});
+
+test("keep-within-region guard preempts when drifting outside", () => {
+  const world = new DemoWorld();
+  const navigation = new DemoNavigationPlanner(world);
+  const context = new ScenarioContext(world, navigation);
+  context.init();
+
+  const program = applyNavigationConstraints(
+    { keepWithinRegion: "east_corridor" },
+    new DoInOrder([moveToRegion("dock_a"), completeProgram()]),
+    "Corridor Scope",
+  );
+
+  const domain = compileGoalProgram<ScenarioContext>("CorridorDrift", program, scenarioHandlers);
+  const planner = new Planner<ScenarioContext>();
+
+  // Begin execution inside corridor.
+  planner.tick(domain, context);
+  world.advance(0.1);
+
+  // Teleport robot outside corridor to violate guard.
+  context.robotPose = pose(3, 0, 0);
+
+  // Next tick should detect guard violation and abort the action.
+  planner.tick(domain, context);
+  world.advance(0.1);
+
+  assert.is(context.constraintDepth, 1, "constraint scope should clean up after guard preemption");
+
+  for (let ticks = 0; ticks < 10; ticks += 1) {
+    if (context.programCompleted) {
+      break;
+    }
+    planner.tick(domain, context);
+    world.advance(0.1);
+  }
+
+  assert.not(context.programCompleted, "drifting outside corridor should block completion");
+});
+
+test("navigation constraint wrapper decorates actions without extra tasks", () => {
   const program = new DoInOrder([
     applyNavigationConstraints({ maximumSpeedMetersPerSecond: 0.5 }, speak("Constraint test")),
     withActionConstraints({ maximumSpeedMetersPerSecond: 0.25 }, speak("Action constraint")),
@@ -1306,10 +1488,10 @@ test("navigation constraint wrapper emits push/pop actions", () => {
 
   const domain = compileGoalProgram<ScenarioContext>("ConstraintScope", program, scenarioHandlers);
   const names = collectTaskNames(domain);
-  assert.ok(names.includes("Push Constraints"), "push action should be present");
   const pushCount = names.filter((name) => name === "Push Constraints").length;
   const popCount = names.filter((name) => name === "Pop Constraints").length;
-  assert.is(pushCount, popCount, "push and pop operations should balance");
+  assert.is(pushCount, 0, "wrapper should avoid emitting push constraint actions");
+  assert.is(popCount, 0, "wrapper should avoid emitting pop constraint actions");
 });
 
 test("deadline guard aborts follow action past window", () => {

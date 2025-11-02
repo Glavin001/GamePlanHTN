@@ -112,8 +112,13 @@ export const applyExecutingConditions = <TContext extends Context = Context>(
   builder: DomainBuilder<TContext>,
   executingConditions: readonly ExecutingConditionSpec<TContext>[],
 ): void => {
+  const seen = new Set<string>();
   for (const condition of executingConditions) {
+    if (seen.has(condition.name)) {
+      continue;
+    }
     builder.executingCondition(condition.name, condition.predicate);
+    seen.add(condition.name);
   }
 };
 
