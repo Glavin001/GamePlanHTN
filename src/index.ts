@@ -9,7 +9,7 @@ import FuncCondition from "./conditions/funcCondition";
 import FuncOperator from "./operators/funcOperator";
 import PrimitiveTask from "./Tasks/primitiveTask";
 import TaskStatus from "./taskStatus";
-import * as GoalPlanning from "./examples/goalPlanning";
+import * as GoalPlanning from "./goalPlanning";
 
 export {
   Domain,
