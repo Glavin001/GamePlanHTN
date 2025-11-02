@@ -82,18 +82,21 @@ export class WithOperators<TContext extends Context = Context> extends GoalProgr
   readonly enter: OperatorSpec<TContext>[];
   readonly exit: OperatorSpec<TContext>[];
   readonly subgoal: GoalProgram;
+  readonly executingConditions: ExecutingConditionSpec<TContext>[];
 
   constructor(
     label: string,
     enter: OperatorSpec<TContext>[],
     subgoal: GoalProgram,
     exit: OperatorSpec<TContext>[] = [],
+    executingConditions: ExecutingConditionSpec<TContext>[] = [],
   ) {
     super();
     this.label = label;
     this.enter = enter;
     this.subgoal = subgoal;
     this.exit = exit;
+    this.executingConditions = executingConditions;
   }
 }
 
@@ -119,7 +122,8 @@ export const withOperators = <TContext extends Context = Context>(
   enter: OperatorSpec<TContext>[],
   subgoal: GoalProgram,
   exit: OperatorSpec<TContext>[] = [],
-): WithOperators<TContext> => new WithOperators(label, enter, subgoal, exit);
+  executingConditions: ExecutingConditionSpec<TContext>[] = [],
+): WithOperators<TContext> => new WithOperators(label, enter, subgoal, exit, executingConditions);
 
 type EmitOptions<TContext extends Context = Context> = {
   builder: DomainBuilder<TContext>;
@@ -183,12 +187,33 @@ const emitProgram = <TContext extends Context = Context>({
       builder.action(operator.name).do(operator.operation, operator.forceStop, operator.abort).end();
     }
 
-    emitProgram({ builder, program: program.subgoal, handlers, executingConditions });
+    const subgoalConditions = executingConditions.concat(program.executingConditions);
 
-    const exitOperators = [...program.exit];
-    for (const operator of exitOperators) {
-      builder.action(operator.name).do(operator.operation, operator.forceStop, operator.abort).end();
+    if (program.exit.length > 0) {
+      builder.select(`${program.label} Scoped Subgoal`);
+
+      builder.sequence(`${program.label} Success Path`);
+      emitProgram({ builder, program: program.subgoal, handlers, executingConditions: subgoalConditions });
+      for (const operator of program.exit) {
+        builder.action(operator.name).do(operator.operation, operator.forceStop, operator.abort).end();
+      }
+      builder.end();
+
+      builder.sequence(`${program.label} Failure Cleanup`);
+      for (const operator of program.exit) {
+        builder
+          .action(`${operator.name} (cleanup)`)
+          .do(operator.operation, operator.forceStop, operator.abort)
+          .end();
+      }
+      builder.action(`${program.label} Cleanup Failure`).do(() => TaskStatus.Failure).end();
+      builder.end();
+
+      builder.end();
+    } else {
+      emitProgram({ builder, program: program.subgoal, handlers, executingConditions: subgoalConditions });
     }
+
     builder.end();
     return;
   }
