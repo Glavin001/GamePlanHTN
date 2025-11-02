@@ -176,6 +176,13 @@ class DemoNavigationPlanner implements ScenarioNavigationPlanner {
       return true;
     }
 
+    if (constraints.requireLineOfSightTo) {
+      const target = this.world.getEntityPose(constraints.requireLineOfSightTo);
+      if (!this.world.hasLineOfSight(start, target, constraints.requireLineOfSightTo)) {
+        return false;
+      }
+    }
+
     const goal = regionCenter(goalRegion);
     const speed = Math.max(constraints.maximumSpeedMetersPerSecond ?? 1, 0.25);
     const required = this.world.distance(start, goal) / speed;
@@ -187,31 +194,117 @@ class DemoNavigationPlanner implements ScenarioNavigationPlanner {
 
   stepTowardRegion(start: Pose, goalRegion: string, constraints: NavigationConstraints): Pose | null {
     const goal = regionCenter(goalRegion);
-    const dir = normalized(goal.x - start.x, goal.y - start.y);
+    const direction = normalized(goal.x - start.x, goal.y - start.y);
     const speed = Math.max(constraints.maximumSpeedMetersPerSecond ?? 1, 0.25);
     const stepSize = speed * 0.2;
-    let candidate = offsetPose(start, dir.x * stepSize, dir.y * stepSize);
 
-    if (constraints.keepWithinRegion) {
+    const conformToKeepWithin = (candidate: Pose): Pose => {
+      if (!constraints.keepWithinRegion) {
+        return candidate;
+      }
+
       if (constraints.keepWithinRegion.toLowerCase() === "east_corridor") {
-        candidate = pose(clamp(candidate.x, -1, 1), clamp(candidate.y, -5, 5), candidate.z);
-      } else if (!this.world.isInsideRegion(candidate, constraints.keepWithinRegion)) {
+        return pose(clamp(candidate.x, -1, 1), clamp(candidate.y, -5, 5), candidate.z);
+      }
+
+      if (!this.world.isInsideRegion(candidate, constraints.keepWithinRegion)) {
         const keepCenter = regionCenter(constraints.keepWithinRegion);
         const backDir = normalized(keepCenter.x - candidate.x, keepCenter.y - candidate.y);
-        candidate = offsetPose(candidate, backDir.x * 0.1, backDir.y * 0.1);
+        return offsetPose(candidate, backDir.x * 0.1, backDir.y * 0.1);
       }
-    }
 
-    if (constraints.avoidRegions.size > 0) {
+      return candidate;
+    };
+
+    const conformToAvoid = (candidate: Pose): Pose => {
+      if (constraints.avoidRegions.size === 0) {
+        return candidate;
+      }
+
+      let adjusted = candidate;
       for (const region of constraints.avoidRegions) {
-        if (this.world.isInsideRegion(candidate, region)) {
-          const perp = { x: -dir.y, y: dir.x };
-          candidate = offsetPose(candidate, perp.x * stepSize * 0.5, perp.y * stepSize * 0.5);
+        if (this.world.isInsideRegion(adjusted, region)) {
+          const perp = { x: -direction.y, y: direction.x };
+          adjusted = offsetPose(adjusted, perp.x * stepSize * 0.5, perp.y * stepSize * 0.5);
         }
       }
+      return adjusted;
+    };
+
+    const targetEntityId = constraints.requireLineOfSightTo ?? constraints.preferLineOfSightTo;
+    const hasLoS = (candidate: Pose): boolean => {
+      if (!targetEntityId) {
+        return true;
+      }
+      return this.world.hasLineOfSight(candidate, this.world.getEntityPose(targetEntityId), targetEntityId);
+    };
+
+    const scoreCandidate = (candidate: Pose): number => {
+      const distanceScore = 1 / (1e-6 + this.world.distance(candidate, goal));
+      const losTarget = targetEntityId;
+      if (!losTarget) {
+        return distanceScore;
+      }
+
+      const visible = hasLoS(candidate);
+      if (visible) {
+        return distanceScore + 1000;
+      }
+
+      if (constraints.preferLineOfSightTo === losTarget) {
+        return distanceScore + 100;
+      }
+
+      return -1000;
+    };
+
+    const conformCandidate = (candidate: Pose): Pose => conformToAvoid(conformToKeepWithin(candidate));
+
+    const forwardCandidate = conformCandidate(offsetPose(start, direction.x * stepSize, direction.y * stepSize));
+
+    if (hasLoS(forwardCandidate) || !constraints.requireLineOfSightTo) {
+      return forwardCandidate;
     }
 
-    return candidate;
+    const perpendicular = { x: -direction.y, y: direction.x };
+    const candidates: Pose[] = [
+      conformCandidate(offsetPose(start, perpendicular.x * stepSize * 0.75, perpendicular.y * stepSize * 0.75)),
+      conformCandidate(offsetPose(start, -perpendicular.x * stepSize * 0.75, -perpendicular.y * stepSize * 0.75)),
+      conformCandidate(
+        offsetPose(
+          start,
+          direction.x * stepSize * 0.5 + perpendicular.x * stepSize * 0.5,
+          direction.y * stepSize * 0.5 + perpendicular.y * stepSize * 0.5,
+        ),
+      ),
+      conformCandidate(
+        offsetPose(
+          start,
+          direction.x * stepSize * 0.5 - perpendicular.x * stepSize * 0.5,
+          direction.y * stepSize * 0.5 - perpendicular.y * stepSize * 0.5,
+        ),
+      ),
+    ];
+
+    let best: Pose | null = null;
+    let bestScore = -Infinity;
+    for (const candidate of candidates) {
+      const score = scoreCandidate(candidate);
+      if (score > bestScore) {
+        best = candidate;
+        bestScore = score;
+      }
+    }
+
+    if (!best) {
+      return null;
+    }
+
+    if (constraints.requireLineOfSightTo && !hasLoS(best)) {
+      return null;
+    }
+
+    return best;
   }
 
   stepToFollow(
@@ -262,6 +355,8 @@ class NavigationConstraints {
   public followEntityId: string | null = null;
   public followRadiusMeters: number | null = null;
   public leaveMinDistanceMeters: number | null = null;
+  public requireLineOfSightTo: string | null = null;
+  public preferLineOfSightTo: string | null = null;
 
   clone(): NavigationConstraints {
     const clone = new NavigationConstraints();
@@ -270,6 +365,8 @@ class NavigationConstraints {
     clone.followEntityId = this.followEntityId;
     clone.followRadiusMeters = this.followRadiusMeters;
     clone.leaveMinDistanceMeters = this.leaveMinDistanceMeters;
+    clone.requireLineOfSightTo = this.requireLineOfSightTo;
+    clone.preferLineOfSightTo = this.preferLineOfSightTo;
     for (const region of this.avoidRegions) {
       clone.avoidRegions.add(region);
     }
@@ -302,9 +399,78 @@ class NavigationConstraints {
       merged.leaveMinDistanceMeters = other.leaveMinDistanceMeters;
     }
 
+    if (other.requireLineOfSightTo) {
+      merged.requireLineOfSightTo = other.requireLineOfSightTo;
+      merged.preferLineOfSightTo = null;
+    }
+
+    if (!merged.requireLineOfSightTo && other.preferLineOfSightTo) {
+      merged.preferLineOfSightTo = other.preferLineOfSightTo;
+    }
+
     return merged;
   }
 }
+
+type NavigationConstraintsInit = {
+  readonly avoidRegions?: Iterable<string>;
+  readonly keepWithinRegion?: string | null;
+  readonly maximumSpeedMetersPerSecond?: number | null;
+  readonly followEntityId?: string | null;
+  readonly followRadiusMeters?: number | null;
+  readonly leaveMinDistanceMeters?: number | null;
+  readonly requireLineOfSightTo?: string | null;
+  readonly preferLineOfSightTo?: string | null;
+};
+
+const toNavigationConstraints = (
+  init: NavigationConstraints | NavigationConstraintsInit,
+): NavigationConstraints => {
+  if (init instanceof NavigationConstraints) {
+    return init.clone();
+  }
+
+  const constraints = new NavigationConstraints();
+
+  if (init.avoidRegions) {
+    for (const region of init.avoidRegions) {
+      constraints.avoidRegions.add(region);
+    }
+  }
+
+  if ("keepWithinRegion" in init && init.keepWithinRegion !== undefined) {
+    constraints.keepWithinRegion = init.keepWithinRegion;
+  }
+
+  if ("maximumSpeedMetersPerSecond" in init && init.maximumSpeedMetersPerSecond !== undefined) {
+    constraints.maximumSpeedMetersPerSecond = init.maximumSpeedMetersPerSecond;
+  }
+
+  if ("followEntityId" in init && init.followEntityId !== undefined) {
+    constraints.followEntityId = init.followEntityId;
+  }
+
+  if ("followRadiusMeters" in init && init.followRadiusMeters !== undefined) {
+    constraints.followRadiusMeters = init.followRadiusMeters;
+  }
+
+  if ("leaveMinDistanceMeters" in init && init.leaveMinDistanceMeters !== undefined) {
+    constraints.leaveMinDistanceMeters = init.leaveMinDistanceMeters;
+  }
+
+  if ("requireLineOfSightTo" in init && init.requireLineOfSightTo !== undefined) {
+    constraints.requireLineOfSightTo = init.requireLineOfSightTo;
+    if (init.requireLineOfSightTo) {
+      constraints.preferLineOfSightTo = null;
+    }
+  }
+
+  if (!constraints.requireLineOfSightTo && "preferLineOfSightTo" in init && init.preferLineOfSightTo !== undefined) {
+    constraints.preferLineOfSightTo = init.preferLineOfSightTo;
+  }
+
+  return constraints;
+};
 
 interface DeadlineScope {
   readonly startSeconds: number;
@@ -586,8 +752,15 @@ const completeProgramOperator = (context: ScenarioContext): TaskStatusValue => {
 // Scenario-specific goal node helpers
 // --------------------------------------------------------------------------------------
 
-const moveToRegion = (region: string): GoalProgram =>
-  new Perform("moveToRegion", { region }, `Move To ${region}`);
+const moveToRegion = (
+  region: string,
+  options: { constraints?: NavigationConstraints | NavigationConstraintsInit; label?: string } = {},
+): GoalProgram =>
+  new Perform(
+    "moveToRegion",
+    { region, constraints: options.constraints ?? null },
+    options.label ?? `Move To ${region}`,
+  );
 
 const followEntity = (entityId: string, radius: number): GoalProgram =>
   new Perform("followEntity", { entityId, radius }, `Follow ${entityId}`);
@@ -603,10 +776,34 @@ const speak = (message: string): GoalProgram => new Perform("speak", { message }
 const completeProgram = (): GoalProgram => new Perform("completeProgram", {}, "Mark Program Complete");
 
 const applyNavigationConstraints = (
-  constraints: NavigationConstraints,
+  constraints: NavigationConstraints | NavigationConstraintsInit,
   subgoal: GoalProgram,
+  label = "Apply Navigation Constraints",
 ): GoalProgram =>
-  withOperators<ScenarioContext>("Apply Navigation Constraints", [pushConstraints(constraints)], subgoal, [popConstraints]);
+  withOperators<ScenarioContext>(label, [pushConstraints(toNavigationConstraints(constraints))], subgoal, [popConstraints]);
+
+const withActionConstraints = (
+  constraints: NavigationConstraints | NavigationConstraintsInit,
+  action: GoalProgram,
+  label = "Action Constraints",
+): GoalProgram => applyNavigationConstraints(constraints, action, label);
+
+const enforceLineOfSightForAction = (
+  entityId: string,
+  action: GoalProgram,
+  options: { hard?: boolean; label?: string } = {},
+): GoalProgram => {
+  const hard = options.hard ?? true;
+  const constraint: NavigationConstraintsInit = hard
+    ? { requireLineOfSightTo: entityId }
+    : { preferLineOfSightTo: entityId };
+  const guard = lineOfSightCondition(entityId);
+  return applyNavigationConstraints(
+    constraint,
+    whileConditionHolds(guard, action),
+    options.label ?? (hard ? `Require line of sight to ${entityId}` : `Prefer line of sight to ${entityId}`),
+  );
+};
 
 const completeWithin = (deadlineSeconds: number, subgoal: GoalProgram): GoalProgram =>
   withOperators<ScenarioContext>("Complete Within Scope", [pushDeadline(deadlineSeconds)], subgoal, [popDeadline]);
@@ -633,11 +830,33 @@ const scenarioHandlers: GoalCompilationHandlers<ScenarioContext> = {
   ) {
     switch (action.action) {
       case "moveToRegion": {
-        const { region } = action.payload as { region: string };
-        builder.action(action.label ?? `Move To ${region}`)
-          .do(moveToRegionOperator(region));
-        applyExecutingConditions(builder, executingConditions.concat([deadlineCondition()]));
-        builder.end();
+        const { region, constraints } = action.payload as {
+          region: string;
+          constraints: NavigationConstraints | NavigationConstraintsInit | null | undefined;
+        };
+        const actionLabel = action.label ?? `Move To ${region}`;
+        const emitAction = (conditions: ExecutingConditionSpec<ScenarioContext>[]) => {
+          builder.action(actionLabel).do(moveToRegionOperator(region));
+          applyExecutingConditions(builder, conditions);
+          builder.end();
+        };
+
+        if (constraints) {
+          builder.sequence(`${actionLabel} (with constraints)`);
+          const scope = toNavigationConstraints(constraints);
+          const pushOp = pushConstraints(scope);
+          builder.action(pushOp.name).do(pushOp.operation, pushOp.forceStop, pushOp.abort).end();
+          const losTarget = scope.requireLineOfSightTo ?? scope.preferLineOfSightTo;
+          const actionConditions = executingConditions.concat([
+            deadlineCondition(),
+            ...(losTarget ? [lineOfSightCondition(losTarget)] : []),
+          ]);
+          emitAction(actionConditions);
+          builder.action(popConstraints.name).do(popConstraints.operation, popConstraints.forceStop, popConstraints.abort).end();
+          builder.end();
+        } else {
+          emitAction(executingConditions.concat([deadlineCondition()]));
+        }
         return;
       }
       case "followEntity": {
@@ -704,12 +923,10 @@ const createFollowPauseLeaveProgram = (): GoalProgram =>
 
 const createEscortVipProgram = (): GoalProgram =>
   applyNavigationConstraints(
-    (() => {
-      const constraints = new NavigationConstraints();
-      constraints.maximumSpeedMetersPerSecond = 1.2;
-      constraints.avoidRegions.add("construction_zone");
-      return constraints;
-    })(),
+    {
+      maximumSpeedMetersPerSecond: 1.2,
+      avoidRegions: ["construction_zone"],
+    },
     new DoInOrder([
       maintainForAtLeast(seconds(15), followEntity("vip_42", 1)),
       moveToRegion("lobby"),
@@ -720,13 +937,9 @@ const createEscortVipProgram = (): GoalProgram =>
 
 const createCorridorWithGuideProgram = (): GoalProgram =>
   applyNavigationConstraints(
-    (() => {
-      const constraints = new NavigationConstraints();
-      constraints.keepWithinRegion = "east_corridor";
-      return constraints;
-    })(),
+    { keepWithinRegion: "east_corridor" },
     new DoInOrder([
-      whileConditionHolds(lineOfSightCondition("guide_bot"), moveToRegion("dock_a")),
+      enforceLineOfSightForAction("guide_bot", moveToRegion("dock_a")),
       maintainForAtLeast(seconds(10), holdPosition(seconds(10))),
       speak("Lost guide line-of-sight; waited at safe stop."),
       completeProgram(),
@@ -735,11 +948,7 @@ const createCorridorWithGuideProgram = (): GoalProgram =>
 
 const createInspectWaypointsProgram = (): GoalProgram =>
   applyNavigationConstraints(
-    (() => {
-      const constraints = new NavigationConstraints();
-      constraints.avoidRegions.add("kitchen");
-      return constraints;
-    })(),
+    { avoidRegions: ["kitchen"] },
     new DoInOrder([
       completeWithin(
         minutes(5),
@@ -766,39 +975,21 @@ const createEmergencyPathProgram = (): GoalProgram =>
 const createCorridorMergeProgram = (): GoalProgram =>
   new DoInOrder([
     applyNavigationConstraints(
-      (() => {
-        const constraints = new NavigationConstraints();
-        constraints.maximumSpeedMetersPerSecond = 0.7;
-        return constraints;
-      })(),
+      { maximumSpeedMetersPerSecond: 0.7 },
       whileConditionHolds(distanceAtMostCondition("alice", 2), moveToRegion("lobby")),
     ),
-    applyNavigationConstraints(
-      (() => {
-        const constraints = new NavigationConstraints();
-        constraints.maximumSpeedMetersPerSecond = 1.2;
-        return constraints;
-      })(),
-      moveToRegion("lobby"),
-    ),
+    moveToRegion("lobby", { constraints: { maximumSpeedMetersPerSecond: 1.2 } }),
     speak("Arrived with courteous pacing."),
     completeProgram(),
   ]);
 
 const createEscortWithHazardProgram = (): GoalProgram =>
   applyNavigationConstraints(
-    (() => {
-      const constraints = new NavigationConstraints();
-      constraints.avoidRegions.add("construction_zone");
-      return constraints;
-    })(),
+    { avoidRegions: ["construction_zone"] },
     new DoInOrder([
-      whileConditionHolds(
-        lineOfSightCondition("vip_42"),
-        maintainForAtLeast(seconds(18), followEntity("vip_42", 1)),
-      ),
+      enforceLineOfSightForAction("vip_42", maintainForAtLeast(seconds(18), followEntity("vip_42", 1))),
       maintainForAtLeast(seconds(5), holdPosition(seconds(5))),
-      whileConditionHolds(lineOfSightCondition("vip_42"), moveToRegion("lobby")),
+      enforceLineOfSightForAction("vip_42", moveToRegion("lobby"), { hard: false }),
       speak("VIP escorted, hazards avoided."),
       completeProgram(),
     ]),
@@ -911,17 +1102,18 @@ test("deadline guard aborts impossible move", () => {
 });
 
 test("navigation constraint wrapper emits push/pop actions", () => {
-  const constraints = new NavigationConstraints();
-  constraints.maximumSpeedMetersPerSecond = 0.5;
   const program = new DoInOrder([
-    applyNavigationConstraints(constraints, speak("Constraint test")),
+    applyNavigationConstraints({ maximumSpeedMetersPerSecond: 0.5 }, speak("Constraint test")),
+    withActionConstraints({ maximumSpeedMetersPerSecond: 0.25 }, speak("Action constraint")),
     completeProgram(),
   ]);
 
   const domain = compileGoalProgram<ScenarioContext>("ConstraintScope", program, scenarioHandlers);
   const names = collectTaskNames(domain);
   assert.ok(names.includes("Push Constraints"), "push action should be present");
-  assert.ok(names.includes("Pop Constraints"), "pop action should be present");
+  const pushCount = names.filter((name) => name === "Push Constraints").length;
+  const popCount = names.filter((name) => name === "Pop Constraints").length;
+  assert.is(pushCount, popCount, "push and pop operations should balance");
 });
 
 test("while condition halts action when predicate fails", () => {
@@ -951,6 +1143,51 @@ test("while condition halts action when predicate fails", () => {
   }
 
   assert.ok(context.messages.includes("Guard fallback"), "fallback action should run after guard failure");
+});
+
+test("action-level move constraints emit scoped push/pop", () => {
+  const program = new DoInOrder([
+    moveToRegion("dock_a", { constraints: { requireLineOfSightTo: "guide_bot" } }),
+    completeProgram(),
+  ]);
+
+  const domain = compileGoalProgram<ScenarioContext>("ActionConstraints", program, scenarioHandlers);
+  const names = collectTaskNames(domain);
+  assert.ok(names.includes("Move To dock_a (with constraints)"), "scoped sequence should be present");
+  assert.ok(names.filter((name) => name === "Push Constraints").length >= 1, "push action emitted");
+  assert.ok(names.filter((name) => name === "Pop Constraints").length >= 1, "pop action emitted");
+});
+
+test("navigation planner enforces hard line-of-sight constraint", () => {
+  const world = new DemoWorld();
+  world.advance(3.5); // within guide_bot loss window
+  const navigation = new DemoNavigationPlanner(world);
+  const constraints = new NavigationConstraints();
+  constraints.requireLineOfSightTo = "guide_bot";
+  const result = navigation.stepTowardRegion(pose(0, 0, 0), "dock_a", constraints);
+  assert.is(result, null, "step should fail when line of sight cannot be satisfied");
+});
+
+test("navigation planner honors soft line-of-sight preference", () => {
+  const world = new DemoWorld();
+  world.advance(3.5); // visibility lost
+  const navigation = new DemoNavigationPlanner(world);
+  const constraints = new NavigationConstraints();
+  constraints.preferLineOfSightTo = "guide_bot";
+  const result = navigation.stepTowardRegion(pose(0, 0, 0), "dock_a", constraints);
+  assert.ok(result, "planner should still return a candidate when LoS is preferred");
+});
+
+test("hasCompliantPath rejects unreachable line-of-sight requirement", () => {
+  const world = new DemoWorld();
+  world.advance(3.5);
+  const navigation = new DemoNavigationPlanner(world);
+  const constraints = new NavigationConstraints();
+  constraints.requireLineOfSightTo = "guide_bot";
+  assert.not(
+    navigation.hasCompliantPath(pose(0, 0, 0), "dock_a", constraints, null),
+    "path feasibility should fail when LoS is currently impossible",
+  );
 });
 
 const collectTaskNames = (domain: Domain<ScenarioContext>): string[] => {
