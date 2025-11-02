@@ -507,5 +507,35 @@ test("GOAP dynamic costs respond to injury and vehicle state", () => {
   assert.is(drivePlan.plan[0].Name, "DriveToTarget");
 });
 
+test("GOAP sequence can use custom goal evaluator", () => {
+  const builder = new DomainBuilder<Context>("GOAP Custom Goal Evaluator Test");
+
+  builder.goapSequence("Collect Apples", { Apples: 2 });
+  builder.goalEvaluator((goal, world) => world.Apples >= goal.Apples);
+
+  builder
+    .goapAction("BuyAppleBundle")
+    .do(() => TaskStatus.Success)
+    .effect("Gain apples", EffectType.PlanOnly, (context, effectType) => {
+      context.setState("Apples", 3, false, effectType ?? EffectType.PlanOnly);
+    })
+    .end();
+
+  builder.end();
+
+  const domain = builder.build();
+
+  const ctx = new Context();
+  ctx.WorldState = { Apples: 0 };
+  ctx.init();
+
+  const { status, plan } = domain.findPlan(ctx);
+
+  assert.equal(status, DecompositionStatus.Succeeded);
+  assert.ok(plan);
+  assert.equal(plan.length, 1);
+  assert.is(plan[0].Name, "BuyAppleBundle");
+});
+
 test.run();
 

@@ -134,7 +134,7 @@ const createVirtualContext = (baseContext: Context, world: WorldState): Context 
   return virtual;
 };
 
-const isGoalSatisfied = (goal: Record<string, number>, world: WorldState): boolean => {
+const defaultGoalEvaluator = (goal: Record<string, number>, world: WorldState): boolean => {
   for (const [key, value] of Object.entries(goal)) {
     if (world[key] !== value) {
       return false;
@@ -177,6 +177,9 @@ const decompose = (context: Context, _startIndex: number, task: CompoundTask): P
 
   const visited = new Map<string, number>();
 
+  const goal = task.Goal;
+  const goalEvaluator = task.GoalEvaluator ?? defaultGoalEvaluator;
+
   while (open.length > 0) {
     let lowestIndex = 0;
 
@@ -196,7 +199,7 @@ const decompose = (context: Context, _startIndex: number, task: CompoundTask): P
 
     visited.set(worldKey, current.cost);
 
-    if (isGoalSatisfied(task.Goal, current.world)) {
+    if (goalEvaluator(goal, current.world, context)) {
       if (context.MethodTraversalRecord.length === 0) {
         context.MethodTraversalRecord.push(0);
       }
