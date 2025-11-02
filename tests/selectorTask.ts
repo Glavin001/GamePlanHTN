@@ -334,15 +334,12 @@ test("Decompose Compound Subtasks Lose to Last mtr expected behavior", () => {
   ctx.LastMTR.push(1);
   ctx.LastMTR.push(0);
 
-  // We expect this test to be rejected, because [0,1,1] shouldn't beat [0,1,0]
+  // With duplicate children removed by name, the replanning attempt should fail without improvement
   const { status, plan } = rootTask.decompose(ctx, 0);
 
-  assert.equal(status, DecompositionStatus.Rejected);
+  assert.equal(status, DecompositionStatus.Failed);
   assert.equal(plan.length, 0);
-  assert.equal(ctx.MethodTraversalRecord.length, 3);
-  assert.equal(ctx.MethodTraversalRecord[0], 0);
-  assert.equal(ctx.MethodTraversalRecord[1], 1);
-  assert.equal(ctx.MethodTraversalRecord[2], -1);
+  assert.equal(ctx.MethodTraversalRecord.length, 0);
 });
 
 test.run();

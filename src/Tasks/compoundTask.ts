@@ -1,7 +1,7 @@
 import log from "loglevel";
 import type Context from "../context";
 import DecompositionStatus from "../decompositionStatus";
-import type { PlanResult } from "../types";
+import type { PlanResult, SuccessorGenerator } from "../types";
 import type { EffectDefinition } from "../effect";
 import type { TaskCondition, PrimitiveTaskOperator, PrimitiveTaskProps } from "./primitiveTask";
 import PrimitiveTask from "./primitiveTask";
@@ -56,6 +56,8 @@ class CompoundTask<TContext extends Context = Context> {
   private goapCost?: (context: TContext) => number;
 
   public Goal?: Record<string, number>;
+
+  private dynamicGenerators?: SuccessorGenerator<TContext>[];
 
   constructor({ name, tasks, type, conditions, goal }: CompoundTaskConfig<TContext>) {
     this.Name = name;
@@ -154,6 +156,69 @@ class CompoundTask<TContext extends Context = Context> {
     this.Children.push(subtask);
 
     return this;
+  }
+
+  addDynamicGenerator(generator: SuccessorGenerator<TContext>): this {
+    if (!this.dynamicGenerators) {
+      this.dynamicGenerators = [];
+    }
+
+    this.dynamicGenerators.push(generator);
+
+    return this;
+  }
+
+  getDynamicGenerators(): SuccessorGenerator<TContext>[] {
+    return this.dynamicGenerators ? [...this.dynamicGenerators] : [];
+  }
+
+  getChildren(context: TContext): CompoundTaskChild<TContext>[] {
+    const seen = new Set<string>();
+    const children: CompoundTaskChild<TContext>[] = [];
+
+    const addChild = (child: CompoundTaskChild<TContext>): void => {
+      if (!child || typeof child.Name !== "string") {
+        return;
+      }
+
+      if (seen.has(child.Name)) {
+        return;
+      }
+
+      seen.add(child.Name);
+      child.Parent = this;
+      children.push(child);
+    };
+
+    for (const child of this.Children) {
+      addChild(child);
+    }
+
+    if (this.dynamicGenerators) {
+      for (const generator of this.dynamicGenerators) {
+        let generated: CompoundTaskChild<TContext>[] | readonly CompoundTaskChild<TContext>[];
+
+        try {
+          generated = generator({ context }) ?? [];
+        } catch (error) {
+          log.warn(`Compound task ${this.Name} dynamic generator threw an error.`, error);
+          continue;
+        }
+
+        for (const child of generated) {
+          if (
+            child instanceof PrimitiveTask ||
+            child instanceof CompoundTask ||
+            child instanceof PausePlanTask ||
+            child instanceof Slot
+          ) {
+            addChild(child);
+          }
+        }
+      }
+    }
+
+    return children;
   }
 
   addCondition(condition: TaskCondition<TContext>): this {

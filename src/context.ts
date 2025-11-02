@@ -7,7 +7,13 @@ export interface WorldStateChange<TValue> {
   value: TValue;
 }
 
+/**
+ * Base shape for planner world state.
+ *
+ * GOAP search serializes these values, so prefer primitives (number, string, boolean, or null) for best results.
+ */
 export type WorldStateBase = Record<string, unknown>;
+/** @deprecated Use {@link WorldStateBase} instead. */
 export type WorldState = Record<string, number>;
 
 export type WorldStateChangeStack<_TWorldState extends WorldStateBase> = Record<string, WorldStateChange<unknown>[]>;

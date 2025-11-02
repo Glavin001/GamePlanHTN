@@ -7,6 +7,7 @@ import PrimitiveTask, { type PrimitiveTaskOperator, type TaskCondition } from ".
 import PausePlanTask from "./Tasks/pausePlanTask";
 import Slot from "./Tasks/slot";
 import Effect from "./effect";
+import type { SuccessorGenerator } from "./types";
 
 type Pointer<TContext extends Context<WorldStateBase>> = CompoundTask<TContext> | PrimitiveTask<TContext>;
 
@@ -62,6 +63,17 @@ class DomainBuilder<TContext extends Context<WorldStateBase> = Context> {
 
   goapSequence(name: string, goal: Record<string, number>): this {
     return this.addCompoundTask(new CompoundTask<TContext>({ name, type: "goap_sequence", goal }));
+  }
+
+  generate(generator: SuccessorGenerator<TContext>): this {
+    const pointer = this.ensureCompoundPointer();
+    pointer.addDynamicGenerator(generator);
+
+    return this;
+  }
+
+  goapGenerate(generator: SuccessorGenerator<TContext>): this {
+    return this.generate(generator);
   }
 
   compoundTask(task: CompoundTask<TContext>): this {
