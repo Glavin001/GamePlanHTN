@@ -1,5 +1,5 @@
 import log from "loglevel";
-import Context from "./context";
+import Context, { type WorldStateBase } from "./context";
 import type { PartialPlanEntry } from "./context";
 import CompoundTask, { type CompoundTaskConfig, type CompoundTaskChild } from "./Tasks/compoundTask";
 import PrimitiveTask, { type PrimitiveTaskOperator, type PrimitiveTaskProps } from "./Tasks/primitiveTask";
@@ -9,32 +9,32 @@ import { ContextState } from "./contextState";
 import type { PlanResult } from "./types";
 import FuncOperator from "./operators/funcOperator";
 
-export type DomainTaskDefinition =
-  | CompoundTask
-  | PrimitiveTask
-  | CompoundTaskConfig
-  | PrimitiveTaskProps
-  | PrimitiveTaskOperator;
+export type DomainTaskDefinition<TContext extends Context<WorldStateBase> = Context> =
+  | CompoundTask<TContext>
+  | PrimitiveTask<TContext>
+  | CompoundTaskConfig<TContext>
+  | PrimitiveTaskProps<TContext>
+  | PrimitiveTaskOperator<TContext>;
 
-export interface DomainOptions {
-  name: string;
-  tasks?: DomainTaskDefinition[];
+export interface DomainOptions<TContext extends Context<WorldStateBase> = Context> {
+  name?: string;
+  tasks?: DomainTaskDefinition<TContext>[];
 }
 
-export interface DomainPlanResult extends PlanResult {}
+export interface DomainPlanResult<TContext extends Context<WorldStateBase> = Context> extends PlanResult<TContext> {}
 
-class Domain {
+class Domain<TContext extends Context<WorldStateBase> = Context> {
   // TODO: Handle actions, conditions, and effects via name lookup as separate objects
   // (see domain test for example)
   public readonly Name: string;
 
-  public readonly Tasks: (CompoundTask | PrimitiveTask)[] = [];
+  public readonly Tasks: (CompoundTask<TContext> | PrimitiveTask<TContext>)[] = [];
 
-  public readonly Root: CompoundTask;
+  public readonly Root: CompoundTask<TContext>;
 
   private slots: Map<number, Slot> | null = null;
 
-  constructor({ name, tasks = [] }: DomainOptions) {
+  constructor({ name = "Domain", tasks = [] }: DomainOptions<TContext>) {
     this.Name = name;
 
     tasks.forEach((task) => {
@@ -43,10 +43,10 @@ class Domain {
 
     // Our root node is a simple 'selector' task across our list of available tasks
     // So planning is essentially decomposing our entire set of tasks
-    this.Root = new CompoundTask({ name: "Root", tasks, type: "select" });
+    this.Root = new CompoundTask<TContext>({ name: "Root", tasks, type: "select" });
   }
 
-  add(parentTask: CompoundTask, childTask: CompoundTaskChild): void {
+  add(parentTask: CompoundTask<TContext>, childTask: CompoundTaskChild<TContext>): void {
     if (parentTask === childTask) {
       throw Error("Parent and child cannot be the same task!");
     }
@@ -71,7 +71,7 @@ class Domain {
 
   // TODO: Refactor into smaller methods
   // eslint-disable-next-line complexity -- Mirrors FluidHTN structure
-  findPlan(context: Context): DomainPlanResult {
+  findPlan(context: TContext): DomainPlanResult<TContext> {
     if (!(context instanceof Context)) {
       throw new TypeError(`Domain received non-context object: ${JSON.stringify(context)}`);
     }
@@ -91,7 +91,7 @@ class Domain {
     // The context is now in planning
     context.ContextState = ContextState.Planning;
 
-    let result: DomainPlanResult = { status: DecompositionStatus.Rejected, plan: [] };
+    let result: DomainPlanResult<TContext> = { status: DecompositionStatus.Rejected, plan: [] };
 
     // We first check whether we have a stored start task. This is true
     // if we had a partial plan pause somewhere in our plan, and we now
@@ -116,23 +116,23 @@ class Domain {
         }
 
         if (result.plan.length === 0) {
-          const kvpStatus = kvp.task.decompose(context, kvp.taskIndex);
+          const kvpStatus = kvp.task.decompose(context, kvp.taskIndex) as PlanResult<TContext>;
 
           result.status = kvpStatus.status;
-          result.plan.push(...kvpStatus.plan);
+          result.plan.push(...kvpStatus.plan as PrimitiveTask<TContext>[]);
 
           if (context.LogDecomposition) {
             log.debug(`Domain.findPlan:Length0:Result - ${JSON.stringify(result)}`);
           }
         } else {
-          const kvpStatus = kvp.task.decompose(context, kvp.taskIndex);
+          const kvpStatus = kvp.task.decompose(context, kvp.taskIndex) as PlanResult<TContext>;
 
           if (context.LogDecomposition) {
             log.debug(`Domain.findPlan:Result ${JSON.stringify(kvpStatus)}`);
           }
           result.status = kvpStatus.status;
           if (kvpStatus.status === DecompositionStatus.Succeeded || kvpStatus.status === DecompositionStatus.Partial) {
-            result.plan.push(...kvpStatus.plan);
+            result.plan.push(...kvpStatus.plan as PrimitiveTask<TContext>[]);
           }
         }
 
@@ -151,7 +151,7 @@ class Domain {
           context.MTRDebug = [];
         }
 
-        result = this.Root.decompose(context, 0);
+        result = this.Root.decompose(context, 0) as DomainPlanResult<TContext>;
       }
     } else {
       let lastPartialPlanQueue: PartialPlanEntry[] | null = null;
@@ -168,7 +168,7 @@ class Domain {
         context.MTRDebug = [];
       }
 
-      result = this.Root.decompose(context, 0);
+      result = this.Root.decompose(context, 0) as DomainPlanResult<TContext>;
       if (context.LogDecomposition) {
         log.debug(`Domain.findPlan: result from decomposing ${JSON.stringify(result)}`);
       }
@@ -238,7 +238,7 @@ class Domain {
     return result;
   }
 
-  trySetSlotDomain(slotId: number, domain: Domain): boolean {
+  trySetSlotDomain(slotId: number, domain: Domain<TContext>): boolean {
     const slot = this.slots?.get(slotId);
     if (!slot) {
       return false;
@@ -252,16 +252,20 @@ class Domain {
     slot?.clear();
   }
 
-  private normalizeTask(task: DomainTaskDefinition): CompoundTask | PrimitiveTask {
-    if (task instanceof PrimitiveTask || task instanceof CompoundTask) {
-      return task;
+  private normalizeTask(task: DomainTaskDefinition<TContext>): CompoundTask<TContext> | PrimitiveTask<TContext> {
+    if (task instanceof PrimitiveTask) {
+      return task as PrimitiveTask<TContext>;
+    }
+
+    if (task instanceof CompoundTask) {
+      return task as CompoundTask<TContext>;
     }
 
     if (typeof task === "function" || task instanceof FuncOperator || (typeof task === "object" && task !== null && "operator" in task)) {
-      return new PrimitiveTask(task as PrimitiveTaskProps);
+      return new PrimitiveTask<TContext>(task as PrimitiveTaskProps<TContext>);
     }
 
-    return new CompoundTask(task as CompoundTaskConfig);
+    return new CompoundTask<TContext>(task as CompoundTaskConfig<TContext>);
   }
 }
 

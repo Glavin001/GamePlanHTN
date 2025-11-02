@@ -5,20 +5,18 @@ import * as assert from "uvu/assert";
 import PrimitiveTask from "../src/Tasks/primitiveTask";
 import Context from "../src/context";
 import Effect from "../src/effect";
+import EffectType from "../src/effectType";
 import TaskStatus from "../src/taskStatus";
 import FuncCondition from "../src/conditions/funcCondition";
 import FuncOperator from "../src/operators/funcOperator";
 
 function getTestContext() {
-  const context = new Context();
-
-  context.WorldState = {
+  return new Context<{ HasA: number; HasB: number; HasC: number; Done: boolean }>({
     HasA: 0,
     HasB: 0,
     HasC: 0,
-  };
-
-  return context;
+    Done: false,
+  });
 }
 
 const prim = {
@@ -27,6 +25,7 @@ const prim = {
   effects: [],
   operator: () => {
     log.info("test");
+    return TaskStatus.Success;
   },
 };
 
@@ -84,18 +83,18 @@ test("AddEffect wraps definition and returns task", () => {
   const task = new PrimitiveTask({ name: "Test" });
   const result = task.addEffect({
     name: "Apply",
-    type: null,
+    type: EffectType.PlanOnly,
     action: (context) => {
-      context.Done = true;
+      context.setState("Done", true, false);
     },
   });
 
   assert.is(result, task);
   assert.is(task.Effects.length, 1);
-  const context = new Context();
+  const context = new Context<{ Done: boolean }>({ Done: false });
   context.init();
   task.applyEffects(context);
-  assert.ok(context.Done);
+  assert.ok(context.hasState("Done"));
 });
 
 test("Create simple functional primitive task ", () => {
@@ -141,6 +140,7 @@ const primPrecon1 = {
   effects: [],
   operator: () => {
     log.info("test");
+    return TaskStatus.Success;
   },
 };
 
@@ -158,6 +158,7 @@ const primPrecon2 = {
   effects: [],
   operator: () => {
     log.info("test");
+    return TaskStatus.Success;
   },
 };
 
@@ -172,7 +173,7 @@ test("Test a passed precondition ", () => {
 test("Test a conditions that aren't functions are invalid ", () => {
   const task = new PrimitiveTask(primPrecon2);
 
-  task.Conditions.push("Spaghetti");
+  task.Conditions.push("Spaghetti" as unknown as (context: Context) => boolean);
 
   const context = new Context();
 
@@ -196,12 +197,12 @@ test("Applying effects, expected behavior ", () => {
   const task = new PrimitiveTask(primPrecon2);
 
   task.Effects.push(new Effect((context) => {
-    context.Done = true;
+    context.setState("Done", true, false);
   }));
 
   task.applyEffects(ctx);
 
-  assert.ok(ctx.Done);
+  assert.ok(ctx.hasState("Done"));
 });
 
 test("Stop and abort handlers trigger when configured", () => {
@@ -232,7 +233,7 @@ test("Stop throws for invalid context", () => {
   const task = new PrimitiveTask({ name: "Handlers" });
 
   assert.throws(() => {
-    task.stop(null);
+    task.stop(null as unknown as Context);
   });
 });
 
@@ -254,14 +255,14 @@ test("Abort handler from config is invoked", () => {
 });
 
 test("Stop with null operator is a no-op", () => {
-  const context = new Context();
+  const context = new Context<{ Done: boolean }>({ Done: false });
   context.init();
   const task = new PrimitiveTask({ name: "No operator" });
 
   task.stop(context);
   task.abort(context);
 
-  assert.is(context.Done, undefined);
+  assert.is(context.hasState("Done", false), true);
 });
 
 test("Set operator accepts FuncOperator", () => {

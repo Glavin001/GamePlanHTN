@@ -1,21 +1,27 @@
 {
   "name": "htn-ai",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "TypeScript Hierarchical Task Network (HTN) planner for game AI, inspired by FluidHTN",
   "type": "module",
   "source": "src/index.ts",
   "exports": {
-    "types": "./dist/types/index.d.ts",
-    "import": "./dist/index.mjs",
-    "require": "./dist/index.cjs"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.mjs"
+    },
+    "./package.json": "./package.json"
   },
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
-  "types": "./dist/types/index.d.ts",
+  "types": "./dist/index.d.ts",
   "unpkg": "./dist/index.global.js",
   "scripts": {
     "build": "tsup",
     "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc --noEmit --project tsconfig.tests.json",
+    "prepublishOnly": "npm run typecheck",
     "test": "tsx --tsconfig tsconfig.tests.json node_modules/uvu/bin.js tests",
     "test:coverage": "c8 --check-coverage --lines 85 --reporter=html --reporter=text tsx --tsconfig tsconfig.tests.json node_modules/uvu/bin.js tests",
     "test:report": "c8 report --reporter=text-lcov > coverage/tests.lcov",
@@ -53,6 +59,7 @@
     "@typescript-eslint/eslint-plugin": "^7.8.0",
     "@typescript-eslint/parser": "^7.8.0",
     "@tivac/eslint-config": "^2.4.0",
+    "@types/node": "^20.12.8",
     "c8": "^7.12.0",
     "chokidar-cli": "^3.0.0",
     "eslint": "^8.28.0",

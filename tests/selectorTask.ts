@@ -2,18 +2,19 @@ import { test } from "uvu";
 import * as assert from "uvu/assert";
 import DecompositionStatus from "../src/decompositionStatus";
 import * as TestUtil from "./utils";
+import type { TestContext } from "./utils";
 
 test("Add condition expected behavior", () => {
-  const task = TestUtil.getEmptySelectorTask("Test");
-  const t = task.addCondition((context) => context.Done === false);
+  const task = TestUtil.getEmptySelectorTask<TestContext>("Test");
+  const t = task.addCondition((context) => context.hasState("Done", false));
 
   assert.equal(t, task);
   assert.equal(task.Conditions.length, 1);
 });
 
 test("Add subtask expected behavior", () => {
-  const task = TestUtil.getEmptySelectorTask("Test");
-  const t = task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task"));
+  const task = TestUtil.getEmptySelectorTask<TestContext>("Test");
+  const t = task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task"));
 
   assert.equal(t, task);
   assert.equal(task.Children.length, 1);
@@ -21,23 +22,23 @@ test("Add subtask expected behavior", () => {
 
 test("Is valid fails without subtasks expected behavior", () => {
   const ctx = TestUtil.getEmptyTestContext();
-  const task = TestUtil.getEmptySelectorTask("Test");
+  const task = TestUtil.getEmptySelectorTask<TestContext>("Test");
 
   assert.equal(task.isValid(ctx), false);
 });
 
 test("Is valid expected behavior", () => {
   const ctx = TestUtil.getEmptyTestContext();
-  const task = TestUtil.getEmptySelectorTask("Test");
+  const task = TestUtil.getEmptySelectorTask<TestContext>("Test");
 
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task"));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task"));
 
   assert.equal(task.isValid(ctx), true);
 });
 
 test("Decompose with no subtasks expected behavior", () => {
   const ctx = TestUtil.getEmptyTestContext();
-  const task = TestUtil.getEmptySelectorTask("Test");
+  const task = TestUtil.getEmptySelectorTask<TestContext>("Test");
   const status = task.decompose(ctx, 0);
 
   assert.equal(status.status, DecompositionStatus.Failed);
@@ -48,10 +49,10 @@ test("Decompose with no subtasks expected behavior", () => {
 test("Decompose with subtasks expected behavior", () => {
   const ctx = TestUtil.getEmptyTestContext();
 
-  const task = TestUtil.getEmptySelectorTask("Test");
+  const task = TestUtil.getEmptySelectorTask<TestContext>("Test");
 
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task1"));
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task2"));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task1"));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2"));
   const status = task.decompose(ctx, 0);
 
   assert.equal(status.status, DecompositionStatus.Succeeded);
@@ -62,10 +63,10 @@ test("Decompose with subtasks expected behavior", () => {
 
 test("Decompose with subtasks 2 expected behavior", () => {
   const ctx = TestUtil.getEmptyTestContext();
-  const task = TestUtil.getEmptySelectorTask("Test");
+  const task = TestUtil.getEmptySelectorTask<TestContext>("Test");
 
-  task.addSubtask(TestUtil.getEmptySelectorTask("Sub-task1"));
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task2"));
+  task.addSubtask(TestUtil.getEmptySelectorTask<TestContext>("Sub-task1"));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2"));
   const status = task.decompose(ctx, 0);
 
   assert.equal(status.status, DecompositionStatus.Succeeded);
@@ -77,10 +78,10 @@ test("Decompose with subtasks 2 expected behavior", () => {
 
 test("Decompose with subtasks 3 expected behavior", () => {
   const ctx = TestUtil.getEmptyTestContext();
-  const task = TestUtil.getEmptySelectorTask("Test");
+  const task = TestUtil.getEmptySelectorTask<TestContext>("Test");
 
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task1").addCondition((context) => context.Done === true));
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task2"));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task1").addCondition((context) => context.hasState("Done")));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2"));
 
   const { status, plan } = task.decompose(ctx, 0);
 
@@ -93,10 +94,10 @@ test("Decompose with subtasks 3 expected behavior", () => {
 
 test("Decompose MTR Fails expected behavior", () => {
   const ctx = TestUtil.getEmptyTestContext();
-  const task = TestUtil.getEmptySelectorTask("Test");
+  const task = TestUtil.getEmptySelectorTask<TestContext>("Test");
 
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task1").addCondition((context) => context.Done === true));
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task2"));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task1").addCondition((context) => context.hasState("Done")));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2"));
 
   ctx.LastMTR.push(0);
   const { status, plan } = task.decompose(ctx, 0);
@@ -109,13 +110,13 @@ test("Decompose MTR Fails expected behavior", () => {
 
 test("DecomposeDebug MTR Fails expected behavior", () => {
   const ctx = TestUtil.getEmptyTestContext();
-  const task = TestUtil.getEmptySelectorTask("Test");
+  const task = TestUtil.getEmptySelectorTask<TestContext>("Test");
 
   ctx.DebugMTR = true;
   ctx.init();
 
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task1").addCondition((context) => context.Done === true));
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task2"));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task1").addCondition((context) => context.hasState("Done")));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2"));
   ctx.LastMTR.push(0);
 
   const { status, plan } = task.decompose(ctx, 0);
@@ -129,10 +130,10 @@ test("DecomposeDebug MTR Fails expected behavior", () => {
 
 test("Decompose MTR Succeeds when equal expected behavior", () => {
   const ctx = TestUtil.getEmptyTestContext();
-  const task = TestUtil.getEmptySelectorTask("Test");
+  const task = TestUtil.getEmptySelectorTask<TestContext>("Test");
 
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task1").addCondition((context) => context.Done === true));
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task2"));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task1").addCondition((context) => context.hasState("Done")));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2"));
 
   ctx.LastMTR.push(1);
   const { status, plan } = task.decompose(ctx, 0);
@@ -147,14 +148,14 @@ test("Decompose MTR Succeeds when equal expected behavior", () => {
 
 test("Decompose Compound Subtasks Succeeds expected behavior", () => {
   const ctx = TestUtil.getEmptyTestContext();
-  const task = TestUtil.getEmptySelectorTask("Test");
-  const task2 = TestUtil.getEmptySelectorTask("Test2");
+  const task = TestUtil.getEmptySelectorTask<TestContext>("Test");
+  const task2 = TestUtil.getEmptySelectorTask<TestContext>("Test2");
 
-  task2.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task1").addCondition((context) => context.Done === true));
-  task2.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task2"));
+  task2.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task1").addCondition((context) => context.hasState("Done")));
+  task2.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2"));
 
   task.addSubtask(task2);
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task3"));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task3"));
 
   const { status, plan } = task.decompose(ctx, 0);
 
@@ -169,14 +170,14 @@ test("Decompose Compound Subtasks Succeeds expected behavior", () => {
 
 test("Decompose Compound Subtasks fails expected behavior", () => {
   const ctx = TestUtil.getEmptyTestContext();
-  const task = TestUtil.getEmptySelectorTask("Test");
-  const task2 = TestUtil.getEmptySelectorTask("Test2");
+  const task = TestUtil.getEmptySelectorTask<TestContext>("Test");
+  const task2 = TestUtil.getEmptySelectorTask<TestContext>("Test2");
 
   task2.addSubtask(TestUtil.getSimplePrimitiveTaskWithDoneCondition("Sub-task1"));
   task2.addSubtask(TestUtil.getSimplePrimitiveTaskWithDoneCondition("Sub-task2"));
 
   task.addSubtask(task2);
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task3"));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task3"));
 
   const { status, plan } = task.decompose(ctx, 0);
 
@@ -191,9 +192,9 @@ test("Decompose Compound Subtasks fails expected behavior", () => {
 
 test("Decompose Nested Compound Subtasks fails expected behavior", () => {
   const ctx = TestUtil.getEmptyTestContext();
-  const task = TestUtil.getEmptySelectorTask("Test");
-  const task2 = TestUtil.getEmptySelectorTask("Test2");
-  const task3 = TestUtil.getEmptySelectorTask("Test3");
+  const task = TestUtil.getEmptySelectorTask<TestContext>("Test");
+  const task2 = TestUtil.getEmptySelectorTask<TestContext>("Test2");
+  const task3 = TestUtil.getEmptySelectorTask<TestContext>("Test3");
 
   task3.addSubtask(TestUtil.getSimplePrimitiveTaskWithDoneCondition("Sub-task1"));
   task3.addSubtask(TestUtil.getSimplePrimitiveTaskWithDoneCondition("Sub-task2"));
@@ -203,7 +204,7 @@ test("Decompose Nested Compound Subtasks fails expected behavior", () => {
 
 
   task.addSubtask(task2);
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task4"));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task4"));
 
   const { status, plan } = task.decompose(ctx, 0);
 
@@ -218,14 +219,14 @@ test("Decompose Nested Compound Subtasks fails expected behavior", () => {
 
 test("Decompose Compound Subtasks beats last mtr expected behavior", () => {
   const ctx = TestUtil.getEmptyTestContext();
-  const task = TestUtil.getEmptySelectorTask("Test");
-  const task2 = TestUtil.getEmptySelectorTask("Test2");
+  const task = TestUtil.getEmptySelectorTask<TestContext>("Test");
+  const task2 = TestUtil.getEmptySelectorTask<TestContext>("Test2");
 
   task2.addSubtask(TestUtil.getSimplePrimitiveTaskWithDoneCondition("Sub-task1"));
-  task2.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task2"));
+  task2.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2"));
 
   task.addSubtask(task2);
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task3"));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task3"));
 
   ctx.LastMTR.push(1);
   const { status, plan } = task.decompose(ctx, 0);
@@ -242,14 +243,14 @@ test("Decompose Compound Subtasks beats last mtr expected behavior", () => {
 
 test("Decompose Compound Subtasks equal to last mtr expected behavior", () => {
   const ctx = TestUtil.getEmptyTestContext();
-  const task = TestUtil.getEmptySelectorTask("Test");
-  const task2 = TestUtil.getEmptySelectorTask("Test2");
+  const task = TestUtil.getEmptySelectorTask<TestContext>("Test");
+  const task2 = TestUtil.getEmptySelectorTask<TestContext>("Test2");
 
   task2.addSubtask(TestUtil.getSimplePrimitiveTaskWithDoneCondition("Sub-task1"));
-  task2.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task2"));
+  task2.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2"));
 
   task.addSubtask(task2);
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task3"));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task3"));
 
   ctx.LastMTR.push(0);
   const { status, plan } = task.decompose(ctx, 0);
@@ -266,11 +267,11 @@ test("Decompose Compound Subtasks equal to last mtr expected behavior", () => {
 
 test("Decompose Compound Subtasks lose to last mtr expected behavior", () => {
   const ctx = TestUtil.getEmptyTestContext();
-  const task = TestUtil.getEmptySelectorTask("Test");
-  const task2 = TestUtil.getEmptySelectorTask("Test2");
+  const task = TestUtil.getEmptySelectorTask<TestContext>("Test");
+  const task2 = TestUtil.getEmptySelectorTask<TestContext>("Test2");
 
   task2.addSubtask(TestUtil.getSimplePrimitiveTaskWithDoneCondition("Sub-task1"));
-  task2.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task2"));
+  task2.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2"));
 
   task.addSubtask(TestUtil.getSimplePrimitiveTaskWithDoneCondition("Sub-task1"));
   task.addSubtask(task2);
@@ -287,20 +288,20 @@ test("Decompose Compound Subtasks lose to last mtr expected behavior", () => {
 
 test("Decompose Compound Subtasks Win over Last mtr expected behavior", () => {
   const ctx = TestUtil.getEmptyTestContext();
-  const rootTask = TestUtil.getEmptySelectorTask("Root");
-  const task = TestUtil.getEmptySelectorTask("Test1");
-  const task2 = TestUtil.getEmptySelectorTask("Test2");
-  const task3 = TestUtil.getEmptySelectorTask("Test3");
+  const rootTask = TestUtil.getEmptySelectorTask<TestContext>("Root");
+  const task = TestUtil.getEmptySelectorTask<TestContext>("Test1");
+  const task2 = TestUtil.getEmptySelectorTask<TestContext>("Test2");
+  const task3 = TestUtil.getEmptySelectorTask<TestContext>("Test3");
 
   task3.addSubtask(TestUtil.getSimplePrimitiveTaskWithDoneCondition("Sub-task3-1"));
-  task3.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task3-2"));
+  task3.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task3-2"));
 
   task2.addSubtask(TestUtil.getSimplePrimitiveTaskWithDoneCondition("Sub-task2-1"));
-  task2.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task2-2"));
+  task2.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2-2"));
 
   task.addSubtask(task2);
   task.addSubtask(task3);
-  task.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task1-1").addCondition((context) => context.Done === false));
+  task.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task1-1").addCondition((context) => context.hasState("Done", false)));
 
   rootTask.addSubtask(task);
 
@@ -317,12 +318,12 @@ test("Decompose Compound Subtasks Win over Last mtr expected behavior", () => {
 
 test("Decompose Compound Subtasks Lose to Last mtr expected behavior", () => {
   const ctx = TestUtil.getEmptyTestContext();
-  const rootTask = TestUtil.getEmptySelectorTask("Root");
-  const task = TestUtil.getEmptySelectorTask("Test1");
-  const task2 = TestUtil.getEmptySelectorTask("Test2");
+  const rootTask = TestUtil.getEmptySelectorTask<TestContext>("Root");
+  const task = TestUtil.getEmptySelectorTask<TestContext>("Test1");
+  const task2 = TestUtil.getEmptySelectorTask<TestContext>("Test2");
 
   task2.addSubtask(TestUtil.getSimplePrimitiveTaskWithDoneCondition("Sub-task2-1"));
-  task2.addSubtask(TestUtil.getSimplePrimitiveTask("Sub-task2-1"));
+  task2.addSubtask(TestUtil.getSimplePrimitiveTask<TestContext>("Sub-task2-1"));
 
   task.addSubtask(TestUtil.getSimplePrimitiveTaskWithDoneCondition("Sub-task1-1"));
   task.addSubtask(task2);

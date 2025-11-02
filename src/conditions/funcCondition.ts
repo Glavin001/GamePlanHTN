@@ -1,13 +1,13 @@
-import Context from "../context";
+import Context, { type WorldStateBase } from "../context";
 
-export type ConditionPredicate = (context: Context) => boolean;
+export type ConditionPredicate<TContext extends Context<WorldStateBase> = Context> = (context: TContext) => boolean;
 
-class FuncCondition {
+class FuncCondition<TContext extends Context<WorldStateBase> = Context> {
   public readonly Name: string;
 
-  private readonly predicate?: ConditionPredicate;
+  private readonly predicate?: ConditionPredicate<TContext>;
 
-  constructor(name: string, predicate?: ConditionPredicate) {
+  constructor(name: string, predicate?: ConditionPredicate<TContext>) {
     this.Name = name;
     this.predicate = predicate;
   }
@@ -17,7 +17,7 @@ class FuncCondition {
       throw new TypeError("Unexpected context type!");
     }
 
-    const result = this.predicate ? this.predicate(context) : false;
+    const result = this.predicate ? this.predicate(context as TContext) : false;
 
     if (context.LogDecomposition) {
       context.DecompositionLog?.push(`FuncCondition(${this.Name}) => ${result}`);

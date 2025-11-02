@@ -16,7 +16,7 @@ test("Init Initializes Collections", () => {
 
   ctx.init();
 
-  assert.is(true, ctx.WorldStateChangeStack !== null);
+  assert.ok(ctx.WorldStateChangeStack);
 
   // TODO: Evaluate how to handle the MyWorldState concept since we're in JS land
   // assert.is(Enum.GetValues(typeof (MyWorldState)).Length, ctx.WorldStateChangeStack.Length);
@@ -45,10 +45,16 @@ test("setState Planning Context expected behavior", () => {
   ctx.setState("HasB", 1, true, EffectType.Permanent);
 
   assert.equal(true, ctx.hasState("HasB"));
-  assert.equal(ctx.WorldStateChangeStack.HasA.length, 0);
-  assert.equal(ctx.WorldStateChangeStack.HasB.length, 1);
-  assert.equal(ctx.WorldStateChangeStack.HasB[0].effectType, EffectType.Permanent);
-  assert.equal(ctx.WorldStateChangeStack.HasB[0].value, 1);
+  const hasAChanges = TestUtil.getWorldStateChangeStack(ctx, "HasA");
+  assert.equal(hasAChanges.length, 0);
+  const hasBChanges = TestUtil.getWorldStateChangeStack(ctx, "HasB");
+  assert.equal(hasBChanges.length, 1);
+  const firstHasBChange = hasBChanges[0];
+  if (!firstHasBChange) {
+    throw new Error("Expected HasB stack to contain an entry");
+  }
+  assert.equal(firstHasBChange.effectType, EffectType.Permanent);
+  assert.equal(firstHasBChange.value, 1);
   assert.equal(ctx.WorldState.HasB, 0);
 });
 
@@ -60,7 +66,8 @@ test("setState executing Context expected behavior", () => {
   ctx.setState("HasB", 1, true, EffectType.Permanent);
 
   assert.ok(ctx.hasState("HasB"));
-  assert.equal(ctx.WorldStateChangeStack.HasB.length, 0);
+  const hasBChanges = TestUtil.getWorldStateChangeStack(ctx, "HasB");
+  assert.equal(hasBChanges.length, 0);
   assert.equal(ctx.WorldState.HasB, 1);
 });
 
@@ -97,7 +104,7 @@ test("GetWorldStateChangeDepth expected behavior", () => {
   const changeDepthExecuting = ctx.getWorldStateChangeDepth();
 
   ctx.ContextState = ContextState.Planning;
-  ctx.setState("HasB", true, EffectType.Permanent);
+  ctx.setState("HasB", 1, true, EffectType.Permanent);
   const changeDepthPlanning = ctx.getWorldStateChangeDepth();
 
   assert.equal(Object.keys(ctx.WorldStateChangeStack).length, Object.keys(changeDepthExecuting).length);
@@ -119,9 +126,12 @@ test("Trim for execution expected behavior", () => {
   ctx.setState("HasC", 1, true, EffectType.PlanOnly);
   ctx.trimForExecution();
 
-  assert.equal(ctx.WorldStateChangeStack.HasA.length, 0);
-  assert.equal(ctx.WorldStateChangeStack.HasB.length, 1);
-  assert.equal(ctx.WorldStateChangeStack.HasC.length, 0);
+  const hasAChanges = TestUtil.getWorldStateChangeStack(ctx, "HasA");
+  const hasBChanges = TestUtil.getWorldStateChangeStack(ctx, "HasB");
+  const hasCChanges = TestUtil.getWorldStateChangeStack(ctx, "HasC");
+  assert.equal(hasAChanges.length, 0);
+  assert.equal(hasBChanges.length, 1);
+  assert.equal(hasCChanges.length, 0);
 });
 
 test("Trim for execution throws exception on wrong context state", () => {
@@ -149,9 +159,12 @@ test("Trim to stack depth expected behavior", () => {
   ctx.setState("HasC", 1, false, EffectType.PlanOnly);
   ctx.trimToStackDepth(stackDepth);
 
-  assert.equal(ctx.WorldStateChangeStack.HasA.length, 1);
-  assert.equal(ctx.WorldStateChangeStack.HasB.length, 1);
-  assert.equal(ctx.WorldStateChangeStack.HasC.length, 1);
+  const hasAChanges = TestUtil.getWorldStateChangeStack(ctx, "HasA");
+  const hasBChanges = TestUtil.getWorldStateChangeStack(ctx, "HasB");
+  const hasCChanges = TestUtil.getWorldStateChangeStack(ctx, "HasC");
+  assert.equal(hasAChanges.length, 1);
+  assert.equal(hasBChanges.length, 1);
+  assert.equal(hasCChanges.length, 1);
 });
 
 test("Trim to stack depth throws exception on wrong context state", () => {

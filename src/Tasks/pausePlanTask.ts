@@ -1,3 +1,5 @@
+import type Context from "../context";
+import type { WorldStateBase } from "../context";
 import type CompoundTask from "./compoundTask";
 
 export interface PausePlanTaskConfig {
@@ -11,7 +13,7 @@ class PausePlanTask {
 
   public readonly Effects: [] = [];
 
-  public Parent?: CompoundTask;
+  public Parent?: CompoundTask<Context<WorldStateBase>>;
 
   constructor(props: PausePlanTaskConfig = { name: "PausePlanTask" }) {
     this.Name = props.name;

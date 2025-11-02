@@ -2,20 +2,22 @@ import { ContextState, ContextStateValue } from "./contextState";
 import EffectType, { EffectTypeValue } from "./effectType";
 import type CompoundTask from "./Tasks/compoundTask";
 
-export interface WorldStateChange {
+export interface WorldStateChange<TValue> {
   effectType: EffectTypeValue;
-  value: number;
+  value: TValue;
 }
 
+export type WorldStateBase = Record<string, unknown>;
 export type WorldState = Record<string, number>;
-export type WorldStateChangeStack = Record<string, WorldStateChange[]>;
+
+export type WorldStateChangeStack<_TWorldState extends WorldStateBase> = Record<string, WorldStateChange<unknown>[]>;
 
 export interface PartialPlanEntry {
   task: CompoundTask;
   taskIndex: number;
 }
 
-class Context {
+class Context<TWorldState extends WorldStateBase = WorldStateBase> {
   public IsInitialized = false;
 
   public IsDirty = false;
@@ -24,13 +26,13 @@ class Context {
 
   public CurrentDecompositionDepth = 0;
 
-  public WorldState: WorldState = {};
+  public WorldState: TWorldState;
 
   public LastMTR: number[] = [];
 
   public MethodTraversalRecord: number[] = [];
 
-  public WorldStateChangeStack: WorldStateChangeStack | null = null;
+  public WorldStateChangeStack: WorldStateChangeStack<TWorldState>;
 
   public MTRDebug: string[] = [];
 
@@ -46,13 +48,17 @@ class Context {
 
   public HasPausedPartialPlan = false;
 
+  constructor(initialWorldState?: TWorldState) {
+    this.WorldState = initialWorldState ? { ...initialWorldState } : ({} as TWorldState);
+    this.WorldStateChangeStack = {} as WorldStateChangeStack<TWorldState>;
+  }
+
   init(): void {
-    if (!this.WorldStateChangeStack) {
-      this.WorldStateChangeStack = {};
-      for (const stateKey of Object.keys(this.WorldState)) {
-        this.WorldStateChangeStack[stateKey] = [];
-      }
+    const stack = {} as WorldStateChangeStack<TWorldState>;
+    for (const stateKey of Object.keys(this.WorldState) as Array<keyof TWorldState & string>) {
+      stack[stateKey] = [];
     }
+    this.WorldStateChangeStack = stack;
 
     if (this.DebugMTR) {
       if (!this.MTRDebug) {
@@ -74,7 +80,10 @@ class Context {
 
   // The `HasState` method returns `true` if the value of the state at the specified index in the `WorldState` array
   // is equal to the specified value. Otherwise, it returns `false`.
-  hasState(state: string, value = 1): boolean {
+  hasState<TStateKey extends keyof TWorldState & string>(
+    state: TStateKey,
+    value: TWorldState[TStateKey] = this.getDefaultStateValue(state),
+  ): boolean {
     return this.getState(state) === value;
   }
 
@@ -82,17 +91,20 @@ class Context {
   // If the `ContextState` is `ContextState.Executing`, it returns the value from the `WorldState` array directly.
   // Otherwise, it returns the value of the topmost object in the `WorldStateChangeStack` array at the specified index,
   // or the value from the `WorldState` array if the stack is empty.
-  getState(state: string): number {
+  getState<TStateKey extends keyof TWorldState & string>(state: TStateKey): TWorldState[TStateKey] {
     if (this.ContextState === ContextState.Executing) {
       return this.WorldState[state];
     }
 
-    const stack = this.WorldStateChangeStack?.[state];
+    const key = state as keyof TWorldState & string;
+    const stack = this.WorldStateChangeStack[key] as
+      | WorldStateChange<TWorldState[TStateKey]>[]
+      | undefined;
     if (!stack || stack.length === 0) {
       return this.WorldState[state];
     }
 
-    return stack[0].value;
+    return stack[0].value as TWorldState[TStateKey];
   }
 
   // The `SetState` method sets the value of the state at the specified index in the `WorldState` array.
@@ -100,26 +112,26 @@ class Context {
   // and the value of the state is not already equal to the specified value.
   // Otherwise, it adds a new object to the `WorldStateChangeStack` array at the specified index with properties
   // "effectType" and "value".
-  setState(state: string, value = 1, setAsDirty = true, effectType: EffectTypeValue = EffectType.Permanent): void {
+  setState<TStateKey extends keyof TWorldState & string>(
+    stateKey: TStateKey,
+    value: TWorldState[TStateKey] = this.getDefaultStateValue(stateKey),
+    setAsDirty = true,
+    effectType: EffectTypeValue = EffectType.Permanent,
+  ): void {
     if (this.ContextState === ContextState.Executing) {
       // Prevent setting the world state dirty if we're not changing anything.
-      if (this.WorldState[state] === value) {
+      if (this.WorldState[stateKey] === value) {
         return;
       }
 
-      this.WorldState[state] = value;
+      this.WorldState[stateKey] = value;
       if (setAsDirty) {
         // When a state change during execution, we need to mark the context dirty for replanning!
         this.IsDirty = true;
       }
     } else {
-      if (!this.WorldStateChangeStack) {
-        this.WorldStateChangeStack = {};
-      }
-      if (!this.WorldStateChangeStack[state]) {
-        this.WorldStateChangeStack[state] = [];
-      }
-      this.WorldStateChangeStack[state].push({
+      const stack = this.getOrCreateWorldStateChangeStack(stateKey);
+      stack.push({
         effectType,
         value,
       });
@@ -145,7 +157,7 @@ class Context {
   // length of each stack in the `WorldStateChangeStack` array. If a stack
   // is `null`, its length is `0`.
   getWorldStateChangeDepth(): Record<string, number> {
-    if (!this.WorldStateChangeStack) {
+    if (!this.IsInitialized) {
       throw new Error("World state change stack has not been initialized");
     }
 
@@ -167,7 +179,7 @@ class Context {
       throw new Error("Can not trim a context when in execution mode");
     }
 
-    if (!this.WorldStateChangeStack) {
+    if (!this.IsInitialized) {
       return;
     }
 
@@ -192,7 +204,7 @@ class Context {
       throw new Error("Can not trim a context when in execution mode");
     }
 
-    if (!this.WorldStateChangeStack) {
+    if (!this.IsInitialized) {
       return;
     }
 
@@ -250,6 +262,32 @@ class Context {
 
   clearPartialPlanQueue(): void {
     this.PartialPlanQueue = [];
+  }
+
+  private getDefaultStateValue<TStateKey extends keyof TWorldState & string>(
+    state: TStateKey,
+  ): TWorldState[TStateKey] {
+    const currentValue = this.WorldState[state];
+
+    if (typeof currentValue === "boolean") {
+      return true as TWorldState[TStateKey];
+    }
+
+    if (typeof currentValue === "number" || typeof currentValue === "undefined") {
+      return 1 as unknown as TWorldState[TStateKey];
+    }
+
+    return currentValue;
+  }
+
+  private getOrCreateWorldStateChangeStack<TStateKey extends keyof TWorldState & string>(
+    stateKey: TStateKey,
+  ): WorldStateChange<TWorldState[TStateKey]>[] {
+    if (!this.WorldStateChangeStack[stateKey]) {
+      this.WorldStateChangeStack[stateKey] = [];
+    }
+
+    return this.WorldStateChangeStack[stateKey] as WorldStateChange<TWorldState[TStateKey]>[];
   }
 }
 

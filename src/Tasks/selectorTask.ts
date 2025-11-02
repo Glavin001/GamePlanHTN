@@ -1,11 +1,12 @@
 import log from "loglevel";
 import type Context from "../context";
+import type { WorldStateBase } from "../context";
 import DecompositionStatus from "../decompositionStatus";
 import type { PlanResult } from "../types";
 import CompoundTask, { type CompoundTaskChild } from "./compoundTask";
 import PrimitiveTask from "./primitiveTask";
 
-const isValid = (context: Context, task: CompoundTask): boolean => {
+const isValid = <TContext extends Context<WorldStateBase>>(context: TContext, task: CompoundTask<TContext>): boolean => {
   if (task.defaultValidityTest(context, task) === false) {
     return false;
   }
@@ -18,7 +19,7 @@ const isValid = (context: Context, task: CompoundTask): boolean => {
   return true;
 };
 
-const beatsLastMTR = (context: Context, taskIndex: number, currentDecompositionIndex: number): boolean => {
+const beatsLastMTR = <TContext extends Context<WorldStateBase>>(context: TContext, taskIndex: number, currentDecompositionIndex: number): boolean => {
   // If the last plan's traversal record for this decomposition layer
   // has a smaller index than the current task index we're about to
   // decompose, then the new decomposition can't possibly beat the
@@ -43,7 +44,12 @@ const beatsLastMTR = (context: Context, taskIndex: number, currentDecompositionI
   return true;
 };
 
-const onDecomposeCompoundTask = (context: Context, childTask: CompoundTask, taskIndex: number, plan: PrimitiveTask[]): PlanResult => {
+const onDecomposeCompoundTask = <TContext extends Context<WorldStateBase>>(
+  context: TContext,
+  childTask: CompoundTask<TContext>,
+  taskIndex: number,
+  plan: PrimitiveTask<TContext>[],
+): PlanResult<TContext> => {
   // We need to record the task index before we decompose the task,
   // so that the traversal record is set up in the right order.
   context.MethodTraversalRecord.push(taskIndex);
@@ -84,11 +90,16 @@ const onDecomposeCompoundTask = (context: Context, childTask: CompoundTask, task
 
   return {
     plan,
-    status: plan.length === 0 ? DecompositionStatus.Failed : DecompositionStatus.Succeeded,
+    status: childResult.status,
   };
 };
 
-const onDecomposeTask = (context: Context, childTask: CompoundTaskChild, taskIndex: number, plan: PrimitiveTask[]): PlanResult => {
+const onDecomposeTask = <TContext extends Context<WorldStateBase>>(
+  context: TContext,
+  childTask: CompoundTaskChild<TContext>,
+  taskIndex: number,
+  plan: PrimitiveTask<TContext>[],
+): PlanResult<TContext> => {
   // If the task we're evaluating is invalid, return the existing plan as the result
   if (!childTask.isValid(context)) {
     if (context.LogDecomposition) {
@@ -111,15 +122,16 @@ const onDecomposeTask = (context: Context, childTask: CompoundTaskChild, taskInd
       log.debug(`Selector.OnDecomposeTask:Pushed ${childTask.Name} to plan!`);
     }
 
-    childTask.applyEffects(context);
-    plan.push(childTask);
+    const primitive = childTask as PrimitiveTask<TContext>;
+    primitive.applyEffects(context);
+    plan.push(primitive);
   }
 
   // TODO: Add support for slots
 
-  const result: PlanResult = {
+  const result: PlanResult<TContext> = {
     plan,
-    status: plan.length === 0 ? DecompositionStatus.Failed : DecompositionStatus.Succeeded,
+    status: DecompositionStatus.Succeeded,
   };
 
   if (context.LogDecomposition) {
@@ -130,8 +142,8 @@ const onDecomposeTask = (context: Context, childTask: CompoundTaskChild, taskInd
 };
 
 // For a selector task, only one child needs to successfully decompose
-const decompose = (context: Context, startIndex: number, task: CompoundTask): PlanResult => {
-  let result: PlanResult = {
+const decompose = <TContext extends Context<WorldStateBase>>(context: TContext, startIndex: number, task: CompoundTask<TContext>): PlanResult<TContext> => {
+  let result: PlanResult<TContext> = {
     plan: [],
     status: DecompositionStatus.Rejected,
   };

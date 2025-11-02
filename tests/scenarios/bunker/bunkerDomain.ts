@@ -1,11 +1,11 @@
-import Domain from "../src/domain";
-import DomainBuilder from "../src/domainBuilder";
-import Context from "../src/context";
-import Planner from "../src/planner";
-import TaskStatus from "../src/taskStatus";
-import EffectType, { type EffectTypeValue } from "../src/effectType";
-import PrimitiveTask from "../src/Tasks/primitiveTask";
-import DecompositionStatus from "../src/decompositionStatus";
+import Domain from "../../../src/domain";
+import DomainBuilder from "../../../src/domainBuilder";
+import Context from "../../../src/context";
+import Planner from "../../../src/planner";
+import TaskStatus from "../../../src/taskStatus";
+import EffectType, { type EffectTypeValue } from "../../../src/effectType";
+import PrimitiveTask from "../../../src/Tasks/primitiveTask";
+import DecompositionStatus from "../../../src/decompositionStatus";
 
 export type Vec3 = [number, number, number];
 
@@ -245,7 +245,7 @@ class BunkerContext extends Context {
   }
 
   getAgentNode(): NodeId {
-    const idx = this.getState(WS.agentAt);
+    const idx = this.getState(WS.agentAt) as number;
     return INDEX_TO_NODE[idx] ?? N.COURTYARD;
   }
 

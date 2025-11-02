@@ -1,17 +1,17 @@
-import Context from "../context";
+import Context, { type WorldStateBase } from "../context";
 import TaskStatus, { type TaskStatusValue } from "../taskStatus";
 
-export type OperatorUpdate = (context: Context) => TaskStatusValue;
-export type OperatorSideEffect = (context: Context) => void;
+export type OperatorUpdate<TContext extends Context<WorldStateBase> = Context> = (context: TContext) => TaskStatusValue;
+export type OperatorSideEffect<TContext extends Context<WorldStateBase> = Context> = (context: TContext) => void;
 
-class FuncOperator {
-  private readonly updateFn?: OperatorUpdate;
+class FuncOperator<TContext extends Context<WorldStateBase> = Context> {
+  private readonly updateFn?: OperatorUpdate<TContext>;
 
-  private readonly stopFn?: OperatorSideEffect;
+  private readonly stopFn?: OperatorSideEffect<TContext>;
 
-  private readonly abortFn?: OperatorSideEffect;
+  private readonly abortFn?: OperatorSideEffect<TContext>;
 
-  constructor(updateFn?: OperatorUpdate, stopFn?: OperatorSideEffect, abortFn?: OperatorSideEffect) {
+  constructor(updateFn?: OperatorUpdate<TContext>, stopFn?: OperatorSideEffect<TContext>, abortFn?: OperatorSideEffect<TContext>) {
     this.updateFn = updateFn;
     this.stopFn = stopFn;
     this.abortFn = abortFn;
@@ -26,7 +26,7 @@ class FuncOperator {
       return TaskStatus.Failure;
     }
 
-    return this.updateFn(context);
+    return this.updateFn(context as TContext);
   }
 
   stop(context?: Context | null): void {
@@ -34,7 +34,7 @@ class FuncOperator {
       throw new TypeError("Unexpected context type!");
     }
 
-    this.stopFn?.(context);
+    this.stopFn?.(context as TContext);
   }
 
   abort(context?: Context | null): void {
@@ -42,7 +42,7 @@ class FuncOperator {
       throw new TypeError("Unexpected context type!");
     }
 
-    this.abortFn?.(context);
+    this.abortFn?.(context as TContext);
   }
 }
 
