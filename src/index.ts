@@ -9,6 +9,7 @@ import FuncCondition from "./conditions/funcCondition";
 import FuncOperator from "./operators/funcOperator";
 import PrimitiveTask from "./Tasks/primitiveTask";
 import TaskStatus from "./taskStatus";
+import * as GoalPlanning from "./examples/goalPlanning";
 
 export {
   Domain,
@@ -22,6 +23,7 @@ export {
   FuncOperator,
   PrimitiveTask,
   TaskStatus,
+  GoalPlanning,
 };
 
 export type { EffectTypeValue } from "./effectType";
@@ -38,4 +40,5 @@ export default {
   FuncOperator,
   PrimitiveTask,
   TaskStatus,
+  GoalPlanning,
 };
