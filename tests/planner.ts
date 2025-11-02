@@ -3,6 +3,7 @@ import * as assert from "uvu/assert";
 import ContextState from "../src/contextState";
 import Effect from "../src/effect";
 import EffectType from "../src/effectType";
+import Domain from "../src/domain";
 import DomainBuilder from "../src/domainBuilder";
 import Planner from "../src/planner";
 import PrimitiveTask from "../src/Tasks/primitiveTask";
@@ -15,7 +16,7 @@ test("Get Plan returns instance at start ", () => {
   const planner = new Planner();
   const plan = planner.getPlan();
 
-  assert.ok(plan, null);
+  assert.ok(plan);
   assert.equal(plan.length, 0);
 });
 
@@ -30,7 +31,7 @@ test("Tick with null parameters throws error ", () => {
   const planner = new Planner();
 
   assert.throws(() => {
-    planner.tick(null, null);
+    planner.tick(null as unknown as Domain<TestContext>, null as unknown as TestContext);
   });
 });
 
@@ -42,7 +43,7 @@ test("Tick with null domain throws exception ", () => {
   const planner = new Planner();
 
   assert.throws(() => {
-    planner.tick(null, ctx);
+    planner.tick(null as unknown as Domain<TestContext>, ctx);
   });
 });
 
@@ -456,7 +457,7 @@ test("On Apply Effec expected behavior ", () => {
   task3.addEffect(new Effect({
     name: "TestEffect",
     type: EffectType.PlanAndExecute,
-    action: (context, type) => context.setState("HasA", 1, true, type),
+    action: (context, type) => context.setState("HasA", 1, true, type ?? undefined),
   }));
   task4.setOperator((_context) => TaskStatus.Continue);
 

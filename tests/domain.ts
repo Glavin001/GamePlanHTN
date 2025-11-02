@@ -202,7 +202,7 @@ test("Planning throws without a context", () => {
   const domain = new Domain<TestContext>({});
 
   assert.throws(() => {
-    domain.findPlan(null);
+    domain.findPlan(null as unknown as TestContext);
   });
 });
 
@@ -232,7 +232,7 @@ test("MTR Null throws exception", () => {
   const ctx = TestUtil.getEmptyTestContext();
 
   ctx.init();
-  ctx.MethodTraversalRecord = null;
+  ctx.MethodTraversalRecord = null as unknown as number[];
 
   const domain = new Domain<TestContext>({ name: "Test" });
 
@@ -305,9 +305,12 @@ test("findPlan trims non permanent state changes", () => {
   const planResult = domain.findPlan(ctx);
 
   assert.equal(planResult.status, DecompositionStatus.Succeeded);
-  assert.equal(ctx.WorldStateChangeStack.HasA.length, 0);
-  assert.equal(ctx.WorldStateChangeStack.HasB.length, 0);
-  assert.equal(ctx.WorldStateChangeStack.HasC.length, 0);
+  const hasAChanges = TestUtil.getWorldStateChangeStack(ctx, "HasA");
+  const hasBChanges = TestUtil.getWorldStateChangeStack(ctx, "HasB");
+  const hasCChanges = TestUtil.getWorldStateChangeStack(ctx, "HasC");
+  assert.equal(hasAChanges.length, 0);
+  assert.equal(hasBChanges.length, 0);
+  assert.equal(hasCChanges.length, 0);
   assert.equal(ctx.WorldState.HasA, 0);
   assert.equal(ctx.WorldState.HasB, 0);
   assert.equal(ctx.WorldState.HasC, 1);
@@ -341,9 +344,12 @@ test("findPlan clears state change when plan is empty", () => {
   const status = domain.findPlan(ctx);
 
   assert.equal(status.status, DecompositionStatus.Rejected);
-  assert.equal(ctx.WorldStateChangeStack.HasA.length, 0);
-  assert.equal(ctx.WorldStateChangeStack.HasB.length, 0);
-  assert.equal(ctx.WorldStateChangeStack.HasC.length, 0);
+  const hasAChanges = TestUtil.getWorldStateChangeStack(ctx, "HasA");
+  const hasBChanges = TestUtil.getWorldStateChangeStack(ctx, "HasB");
+  const hasCChanges = TestUtil.getWorldStateChangeStack(ctx, "HasC");
+  assert.equal(hasAChanges.length, 0);
+  assert.equal(hasBChanges.length, 0);
+  assert.equal(hasCChanges.length, 0);
   assert.equal(ctx.WorldState.HasA, 0);
   assert.equal(ctx.WorldState.HasB, 0);
   assert.equal(ctx.WorldState.HasC, 0);
@@ -465,7 +471,8 @@ test("Continue Paused Plan expected behavior", () => {
   assert.equal(status, DecompositionStatus.Partial);
   assert.ok(plan);
   assert.equal(plan.length, 1);
-  assert.equal("Sub-task1", plan.shift().Name);
+  const firstStep = TestUtil.shiftOrFail(plan);
+  assert.equal("Sub-task1", firstStep.Name);
   assert.equal(ctx.HasPausedPartialPlan, true);
   assert.equal(ctx.PartialPlanQueue.length, 1);
   assert.equal(task, ctx.PartialPlanQueue[0].task);
@@ -543,7 +550,8 @@ test("Continue nested pause plan expected behavior", () => {
   assert.equal(status, DecompositionStatus.Partial);
   assert.ok(plan);
   assert.equal(plan.length, 1);
-  assert.equal("Sub-task1", plan.shift().Name);
+  const firstStep = TestUtil.shiftOrFail(plan);
+  assert.equal("Sub-task1", firstStep.Name);
   assert.ok(ctx.HasPausedPartialPlan);
   assert.equal(ctx.PartialPlanQueue.length, 2);
   const queueAsArray = ctx.PartialPlanQueue;
@@ -558,8 +566,10 @@ test("Continue nested pause plan expected behavior", () => {
   assert.equal(status, DecompositionStatus.Succeeded);
   assert.ok(plan);
   assert.equal(plan.length, 2);
-  assert.equal("Sub-task2", plan.shift().Name);
-  assert.equal("Sub-task4", plan.shift().Name);
+  const secondStep = TestUtil.shiftOrFail(plan);
+  assert.equal("Sub-task2", secondStep.Name);
+  const thirdStep = TestUtil.shiftOrFail(plan);
+  assert.equal("Sub-task4", thirdStep.Name);
 });
 
 test("Continue multiple nested pause plan expected behavior", () => {
@@ -596,7 +606,8 @@ test("Continue multiple nested pause plan expected behavior", () => {
   assert.equal(status, DecompositionStatus.Partial);
   assert.ok(plan);
   assert.equal(plan.length, 1);
-  assert.equal("Sub-task1", plan.shift().Name);
+  const firstStep = TestUtil.shiftOrFail(plan);
+  assert.equal("Sub-task1", firstStep.Name);
   assert.ok(ctx.HasPausedPartialPlan);
   assert.equal(ctx.PartialPlanQueue.length, 2);
   const queueAsArray = ctx.PartialPlanQueue;
@@ -611,17 +622,22 @@ test("Continue multiple nested pause plan expected behavior", () => {
   assert.equal(status, DecompositionStatus.Partial);
   assert.ok(plan);
   assert.equal(plan.length, 3);
-  assert.equal("Sub-task2", plan.shift().Name);
-  assert.equal("Sub-task4", plan.shift().Name);
-  assert.equal("Sub-task5", plan.shift().Name);
+  const secondStep = TestUtil.shiftOrFail(plan);
+  assert.equal("Sub-task2", secondStep.Name);
+  const thirdStep = TestUtil.shiftOrFail(plan);
+  assert.equal("Sub-task4", thirdStep.Name);
+  const fourthStep = TestUtil.shiftOrFail(plan);
+  assert.equal("Sub-task5", fourthStep.Name);
 
   ({ status, plan } = domain.findPlan(ctx));
 
   assert.equal(status, DecompositionStatus.Succeeded);
   assert.ok(plan);
   assert.equal(plan.length, 2);
-  assert.equal("Sub-task6", plan.shift().Name);
-  assert.equal("Sub-task7", plan.shift().Name);
+  const sixthStep = TestUtil.shiftOrFail(plan);
+  assert.equal("Sub-task6", sixthStep.Name);
+  const seventhStep = TestUtil.shiftOrFail(plan);
+  assert.equal("Sub-task7", seventhStep.Name);
 });
 
 test.run();

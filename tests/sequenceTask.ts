@@ -168,9 +168,12 @@ test("Decompose Failure return to previous world state expected behavior", () =>
   assert.equal(status, DecompositionStatus.Failed);
   assert.ok(plan);
   assert.equal(plan.length, 0);
-  assert.equal(ctx.WorldStateChangeStack.HasA.length, 1);
-  assert.equal(ctx.WorldStateChangeStack.HasB.length, 1);
-  assert.equal(ctx.WorldStateChangeStack.HasC.length, 1);
+  const hasAChanges = TestUtil.getWorldStateChangeStack(ctx, "HasA");
+  const hasBChanges = TestUtil.getWorldStateChangeStack(ctx, "HasB");
+  const hasCChanges = TestUtil.getWorldStateChangeStack(ctx, "HasC");
+  assert.equal(hasAChanges.length, 1);
+  assert.equal(hasBChanges.length, 1);
+  assert.equal(hasCChanges.length, 1);
   assert.equal(1, ctx.getState("HasA"));
   assert.equal(1, ctx.getState("HasB"));
   assert.equal(1, ctx.getState("HasC"));
@@ -272,8 +275,10 @@ test("Decompose Nested Compound Subtask equal to MTR expected behavior", () => {
   assert.equal(ctx.MethodTraversalRecord.length, 2);
   assert.equal(ctx.MethodTraversalRecord[0], 1);
   assert.equal(ctx.MethodTraversalRecord[1], 1);
-  assert.equal("Sub-task3", plan.shift().Name);
-  assert.equal("Sub-task4", plan.shift().Name);
+  const thirdStep = TestUtil.shiftOrFail(plan);
+  assert.equal("Sub-task3", thirdStep.Name);
+  const fourthStep = TestUtil.shiftOrFail(plan);
+  assert.equal("Sub-task4", fourthStep.Name);
 });
 
 
@@ -330,9 +335,12 @@ test("Decompose Nested Compound Subtask lost to MTR return to previous world sta
   assert.equal(ctx.MethodTraversalRecord.length, 2);
   assert.equal(ctx.MethodTraversalRecord[0], 0);
   assert.equal(ctx.MethodTraversalRecord[1], -1);
-  assert.equal(ctx.WorldStateChangeStack.HasA.length, 1);
-  assert.equal(ctx.WorldStateChangeStack.HasB.length, 1);
-  assert.equal(ctx.WorldStateChangeStack.HasC.length, 1);
+  const hasAChanges = TestUtil.getWorldStateChangeStack(ctx, "HasA");
+  const hasBChanges = TestUtil.getWorldStateChangeStack(ctx, "HasB");
+  const hasCChanges = TestUtil.getWorldStateChangeStack(ctx, "HasC");
+  assert.equal(hasAChanges.length, 1);
+  assert.equal(hasBChanges.length, 1);
+  assert.equal(hasCChanges.length, 1);
   assert.equal(1, ctx.getState("HasA"));
   assert.equal(1, ctx.getState("HasB"));
   assert.equal(1, ctx.getState("HasC"));
@@ -390,9 +398,12 @@ test("Decompose Nested Compound Subtask Fail Return to Previous World State expe
   assert.equal(status, DecompositionStatus.Failed);
   assert.ok(plan);
   assert.equal(plan.length, 0);
-  assert.equal(ctx.WorldStateChangeStack.HasA.length, 1);
-  assert.equal(ctx.WorldStateChangeStack.HasB.length, 1);
-  assert.equal(ctx.WorldStateChangeStack.HasC.length, 1);
+  const hasAChanges = TestUtil.getWorldStateChangeStack(ctx, "HasA");
+  const hasBChanges = TestUtil.getWorldStateChangeStack(ctx, "HasB");
+  const hasCChanges = TestUtil.getWorldStateChangeStack(ctx, "HasC");
+  assert.equal(hasAChanges.length, 1);
+  assert.equal(hasBChanges.length, 1);
+  assert.equal(hasCChanges.length, 1);
   assert.equal(1, ctx.getState("HasA"));
   assert.equal(1, ctx.getState("HasB"));
   assert.equal(1, ctx.getState("HasC"));
@@ -439,7 +450,8 @@ test("Continue PausePlan expected behavior", () => {
   assert.equal(status, DecompositionStatus.Partial);
   assert.ok(plan);
   assert.equal(plan.length, 1);
-  assert.equal("Sub-task1", plan.shift().Name);
+  const firstStep = TestUtil.shiftOrFail(plan);
+  assert.equal("Sub-task1", firstStep.Name);
   assert.equal(ctx.HasPausedPartialPlan, true);
   assert.equal(ctx.PartialPlanQueue.length, 1);
   assert.equal(task, ctx.PartialPlanQueue[0].task);
@@ -448,13 +460,14 @@ test("Continue PausePlan expected behavior", () => {
   ctx.HasPausedPartialPlan = false;
   plan = [];
   while (ctx.PartialPlanQueue.length > 0) {
-    const kvp = ctx.PartialPlanQueue.shift();
+    const kvp = TestUtil.shiftOrFail(ctx.PartialPlanQueue);
 
     const { status: s, plan: p } = kvp.task.decompose(ctx, kvp.taskIndex);
 
     if (s === DecompositionStatus.Succeeded || s === DecompositionStatus.Partial) {
       while (p.length > 0) {
-        plan.push(p.shift() as PrimitiveTask<TestContext>);
+        const nextStep = TestUtil.shiftOrFail(p) as PrimitiveTask<TestContext>;
+        plan.push(nextStep);
       }
     }
   }
@@ -525,7 +538,8 @@ test("Continue Nested PausePlan expected behavior", () => {
   assert.equal(status, DecompositionStatus.Partial);
   assert.ok(plan);
   assert.equal(plan.length, 1);
-  assert.equal("Sub-task1", plan.shift().Name);
+  const firstStep = TestUtil.shiftOrFail(plan);
+  assert.equal("Sub-task1", firstStep.Name);
   assert.equal(ctx.HasPausedPartialPlan, true);
   assert.equal(ctx.PartialPlanQueue.length, 2);
   const queueAsArray = ctx.PartialPlanQueue;
@@ -538,12 +552,13 @@ test("Continue Nested PausePlan expected behavior", () => {
   ctx.HasPausedPartialPlan = false;
   plan = [];
   while (ctx.PartialPlanQueue.length > 0) {
-    const kvp = ctx.PartialPlanQueue.shift();
+    const kvp = TestUtil.shiftOrFail(ctx.PartialPlanQueue);
     const { status: s, plan: p } = kvp.task.decompose(ctx, kvp.taskIndex);
 
     if (s === DecompositionStatus.Succeeded || s === DecompositionStatus.Partial) {
       while (p.length > 0) {
-        plan.push(p.shift() as PrimitiveTask<TestContext>);
+        const nextStep = TestUtil.shiftOrFail(p) as PrimitiveTask<TestContext>;
+        plan.push(nextStep);
       }
     }
 
@@ -554,8 +569,10 @@ test("Continue Nested PausePlan expected behavior", () => {
 
   assert.ok(plan);
   assert.equal(plan.length, 2);
-  assert.equal("Sub-task2", plan.shift().Name);
-  assert.equal("Sub-task4", plan.shift().Name);
+  const secondStep = TestUtil.shiftOrFail(plan);
+  assert.equal("Sub-task2", secondStep.Name);
+  const thirdStep = TestUtil.shiftOrFail(plan);
+  assert.equal("Sub-task4", thirdStep.Name);
 });
 
 test("Continue Multiple Nested PausePlan expected behavior", () => {
@@ -590,7 +607,8 @@ test("Continue Multiple Nested PausePlan expected behavior", () => {
   assert.equal(status, DecompositionStatus.Partial);
   assert.ok(plan);
   assert.equal(plan.length, 1);
-  assert.equal("Sub-task1", plan.shift().Name);
+  const firstStep = TestUtil.shiftOrFail(plan);
+  assert.equal("Sub-task1", firstStep.Name);
   assert.equal(ctx.HasPausedPartialPlan, true);
   assert.equal(ctx.PartialPlanQueue.length, 2);
   const queueAsArray = ctx.PartialPlanQueue;
@@ -604,12 +622,13 @@ test("Continue Multiple Nested PausePlan expected behavior", () => {
   plan = [];
 
   while (ctx.PartialPlanQueue.length > 0) {
-    const kvp = ctx.PartialPlanQueue.shift();
+    const kvp = TestUtil.shiftOrFail(ctx.PartialPlanQueue);
     const { status: s, plan: p } = kvp.task.decompose(ctx, kvp.taskIndex);
 
     if (s === DecompositionStatus.Succeeded || s === DecompositionStatus.Partial) {
       while (p.length > 0) {
-        plan.push(p.shift() as PrimitiveTask<TestContext>);
+        const nextStep = TestUtil.shiftOrFail(p) as PrimitiveTask<TestContext>;
+        plan.push(nextStep);
       }
     }
 
@@ -620,19 +639,23 @@ test("Continue Multiple Nested PausePlan expected behavior", () => {
 
   assert.ok(plan);
   assert.equal(plan.length, 3);
-  assert.equal("Sub-task2", plan.shift().Name);
-  assert.equal("Sub-task4", plan.shift().Name);
-  assert.equal("Sub-task5", plan.shift().Name);
+  const secondStep = TestUtil.shiftOrFail(plan);
+  assert.equal("Sub-task2", secondStep.Name);
+  const thirdStep = TestUtil.shiftOrFail(plan);
+  assert.equal("Sub-task4", thirdStep.Name);
+  const fourthStep = TestUtil.shiftOrFail(plan);
+  assert.equal("Sub-task5", fourthStep.Name);
 
   ctx.HasPausedPartialPlan = false;
   plan = [];
   while (ctx.PartialPlanQueue.length > 0) {
-    const kvp = ctx.PartialPlanQueue.shift();
+    const kvp = TestUtil.shiftOrFail(ctx.PartialPlanQueue);
     const { status: s, plan: p } = kvp.task.decompose(ctx, kvp.taskIndex);
 
     if (s === DecompositionStatus.Succeeded || s === DecompositionStatus.Partial) {
       while (p.length > 0) {
-        plan.push(p.shift() as PrimitiveTask<TestContext>);
+        const nextStep = TestUtil.shiftOrFail(p) as PrimitiveTask<TestContext>;
+        plan.push(nextStep);
       }
     }
 
@@ -643,8 +666,10 @@ test("Continue Multiple Nested PausePlan expected behavior", () => {
 
   assert.ok(plan);
   assert.equal(plan.length, 2);
-  assert.equal("Sub-task6", plan.shift().Name);
-  assert.equal("Sub-task7", plan.shift().Name);
+  const sixthStep = TestUtil.shiftOrFail(plan);
+  assert.equal("Sub-task6", sixthStep.Name);
+  const seventhStep = TestUtil.shiftOrFail(plan);
+  assert.equal("Sub-task7", seventhStep.Name);
 });
 
 

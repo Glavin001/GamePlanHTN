@@ -10,9 +10,7 @@ export interface WorldStateChange<TValue> {
 export type WorldStateBase = Record<string, unknown>;
 export type WorldState = Record<string, number>;
 
-export type WorldStateChangeStack<TWorldState extends WorldStateBase> = {
-  [K in keyof TWorldState & string]?: WorldStateChange<TWorldState[K]>[];
-};
+export type WorldStateChangeStack<_TWorldState extends WorldStateBase> = Record<string, WorldStateChange<unknown>[]>;
 
 export interface PartialPlanEntry {
   task: CompoundTask;
@@ -34,7 +32,7 @@ class Context<TWorldState extends WorldStateBase = WorldStateBase> {
 
   public MethodTraversalRecord: number[] = [];
 
-  public WorldStateChangeStack: WorldStateChangeStack<TWorldState> | null = null;
+  public WorldStateChangeStack: WorldStateChangeStack<TWorldState>;
 
   public MTRDebug: string[] = [];
 
@@ -52,16 +50,15 @@ class Context<TWorldState extends WorldStateBase = WorldStateBase> {
 
   constructor(initialWorldState?: TWorldState) {
     this.WorldState = initialWorldState ? { ...initialWorldState } : ({} as TWorldState);
+    this.WorldStateChangeStack = {} as WorldStateChangeStack<TWorldState>;
   }
 
   init(): void {
-    if (!this.WorldStateChangeStack) {
-      const stack = {} as WorldStateChangeStack<TWorldState>;
-      for (const stateKey of Object.keys(this.WorldState) as Array<keyof TWorldState & string>) {
-        stack[stateKey] = [];
-      }
-      this.WorldStateChangeStack = stack;
+    const stack = {} as WorldStateChangeStack<TWorldState>;
+    for (const stateKey of Object.keys(this.WorldState) as Array<keyof TWorldState & string>) {
+      stack[stateKey] = [];
     }
+    this.WorldStateChangeStack = stack;
 
     if (this.DebugMTR) {
       if (!this.MTRDebug) {
@@ -100,7 +97,9 @@ class Context<TWorldState extends WorldStateBase = WorldStateBase> {
     }
 
     const key = state as keyof TWorldState & string;
-    const stack = this.WorldStateChangeStack?.[key];
+    const stack = this.WorldStateChangeStack[key] as
+      | WorldStateChange<TWorldState[TStateKey]>[]
+      | undefined;
     if (!stack || stack.length === 0) {
       return this.WorldState[state];
     }
@@ -158,7 +157,7 @@ class Context<TWorldState extends WorldStateBase = WorldStateBase> {
   // length of each stack in the `WorldStateChangeStack` array. If a stack
   // is `null`, its length is `0`.
   getWorldStateChangeDepth(): Record<string, number> {
-    if (!this.WorldStateChangeStack) {
+    if (!this.IsInitialized) {
       throw new Error("World state change stack has not been initialized");
     }
 
@@ -180,7 +179,7 @@ class Context<TWorldState extends WorldStateBase = WorldStateBase> {
       throw new Error("Can not trim a context when in execution mode");
     }
 
-    if (!this.WorldStateChangeStack) {
+    if (!this.IsInitialized) {
       return;
     }
 
@@ -205,7 +204,7 @@ class Context<TWorldState extends WorldStateBase = WorldStateBase> {
       throw new Error("Can not trim a context when in execution mode");
     }
 
-    if (!this.WorldStateChangeStack) {
+    if (!this.IsInitialized) {
       return;
     }
 
@@ -284,15 +283,11 @@ class Context<TWorldState extends WorldStateBase = WorldStateBase> {
   private getOrCreateWorldStateChangeStack<TStateKey extends keyof TWorldState & string>(
     stateKey: TStateKey,
   ): WorldStateChange<TWorldState[TStateKey]>[] {
-    if (!this.WorldStateChangeStack) {
-      this.WorldStateChangeStack = {} as WorldStateChangeStack<TWorldState>;
-    }
-
     if (!this.WorldStateChangeStack[stateKey]) {
-      this.WorldStateChangeStack[stateKey] = [] as WorldStateChange<TWorldState[TStateKey]>[];
+      this.WorldStateChangeStack[stateKey] = [];
     }
 
-    return this.WorldStateChangeStack[stateKey]!;
+    return this.WorldStateChangeStack[stateKey] as WorldStateChange<TWorldState[TStateKey]>[];
   }
 }
 

@@ -9,7 +9,7 @@
     "outDir": "dist/types",
     "rootDir": "src",
     "strict": false,
-    "strictNullChecks": false,
+    "strictNullChecks": true,
     "allowJs": false,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
