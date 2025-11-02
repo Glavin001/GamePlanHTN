@@ -10,11 +10,7 @@ export interface WorldStateChange<TValue> {
 export type WorldStateBase = Record<string, unknown>;
 export type WorldState = Record<string, number>;
 
-export type WorldStateChangeStack<TWorldState extends WorldStateBase> = {
-  [K in keyof TWorldState]?: WorldStateChange<TWorldState[K]>[];
-} & {
-  [key: string]: WorldStateChange<TWorldState[keyof TWorldState]>[] | undefined;
-};
+export type WorldStateChangeStack<_TWorldState extends WorldStateBase> = Record<string, WorldStateChange<unknown>[]>;
 
 export interface PartialPlanEntry {
   task: CompoundTask;
@@ -36,7 +32,7 @@ class Context<TWorldState extends WorldStateBase = WorldStateBase> {
 
   public MethodTraversalRecord: number[] = [];
 
-  public WorldStateChangeStack: WorldStateChangeStack<TWorldState> | null = null;
+  public WorldStateChangeStack: WorldStateChangeStack<TWorldState>;
 
   public MTRDebug: string[] = [];
 
@@ -54,16 +50,15 @@ class Context<TWorldState extends WorldStateBase = WorldStateBase> {
 
   constructor(initialWorldState?: TWorldState) {
     this.WorldState = initialWorldState ? { ...initialWorldState } : ({} as TWorldState);
+    this.WorldStateChangeStack = {} as WorldStateChangeStack<TWorldState>;
   }
 
   init(): void {
-    if (!this.WorldStateChangeStack) {
-      const stack = {} as WorldStateChangeStack<TWorldState>;
-      for (const stateKey of Object.keys(this.WorldState) as Array<keyof TWorldState & string>) {
-        stack[stateKey] = [];
-      }
-      this.WorldStateChangeStack = stack;
+    const stack = {} as WorldStateChangeStack<TWorldState>;
+    for (const stateKey of Object.keys(this.WorldState) as Array<keyof TWorldState & string>) {
+      stack[stateKey] = [];
     }
+    this.WorldStateChangeStack = stack;
 
     if (this.DebugMTR) {
       if (!this.MTRDebug) {
@@ -85,7 +80,7 @@ class Context<TWorldState extends WorldStateBase = WorldStateBase> {
 
   // The `HasState` method returns `true` if the value of the state at the specified index in the `WorldState` array
   // is equal to the specified value. Otherwise, it returns `false`.
-  hasState<TStateKey extends keyof TWorldState>(
+  hasState<TStateKey extends keyof TWorldState & string>(
     state: TStateKey,
     value: TWorldState[TStateKey] = this.getDefaultStateValue(state),
   ): boolean {
@@ -96,13 +91,15 @@ class Context<TWorldState extends WorldStateBase = WorldStateBase> {
   // If the `ContextState` is `ContextState.Executing`, it returns the value from the `WorldState` array directly.
   // Otherwise, it returns the value of the topmost object in the `WorldStateChangeStack` array at the specified index,
   // or the value from the `WorldState` array if the stack is empty.
-  getState<TStateKey extends keyof TWorldState>(state: TStateKey): TWorldState[TStateKey] {
+  getState<TStateKey extends keyof TWorldState & string>(state: TStateKey): TWorldState[TStateKey] {
     if (this.ContextState === ContextState.Executing) {
       return this.WorldState[state];
     }
 
     const key = state as keyof TWorldState & string;
-    const stack = this.WorldStateChangeStack?.[key];
+    const stack = this.WorldStateChangeStack[key] as
+      | WorldStateChange<TWorldState[TStateKey]>[]
+      | undefined;
     if (!stack || stack.length === 0) {
       return this.WorldState[state];
     }
@@ -115,7 +112,7 @@ class Context<TWorldState extends WorldStateBase = WorldStateBase> {
   // and the value of the state is not already equal to the specified value.
   // Otherwise, it adds a new object to the `WorldStateChangeStack` array at the specified index with properties
   // "effectType" and "value".
-  setState<TStateKey extends keyof TWorldState>(
+  setState<TStateKey extends keyof TWorldState & string>(
     stateKey: TStateKey,
     value: TWorldState[TStateKey] = this.getDefaultStateValue(stateKey),
     setAsDirty = true,
@@ -133,14 +130,8 @@ class Context<TWorldState extends WorldStateBase = WorldStateBase> {
         this.IsDirty = true;
       }
     } else {
-      if (!this.WorldStateChangeStack) {
-        this.WorldStateChangeStack = {} as WorldStateChangeStack<TWorldState>;
-      }
-      // const key = stateKey as keyof TWorldState & string;
-      if (!this.WorldStateChangeStack[stateKey]) {
-        this.WorldStateChangeStack[stateKey] = [] as WorldStateChange<TWorldState[TStateKey]>[];
-      }
-      this.WorldStateChangeStack[stateKey]?.push({
+      const stack = this.getOrCreateWorldStateChangeStack(stateKey);
+      stack.push({
         effectType,
         value,
       });
@@ -166,7 +157,7 @@ class Context<TWorldState extends WorldStateBase = WorldStateBase> {
   // length of each stack in the `WorldStateChangeStack` array. If a stack
   // is `null`, its length is `0`.
   getWorldStateChangeDepth(): Record<string, number> {
-    if (!this.WorldStateChangeStack) {
+    if (!this.IsInitialized) {
       throw new Error("World state change stack has not been initialized");
     }
 
@@ -188,7 +179,7 @@ class Context<TWorldState extends WorldStateBase = WorldStateBase> {
       throw new Error("Can not trim a context when in execution mode");
     }
 
-    if (!this.WorldStateChangeStack) {
+    if (!this.IsInitialized) {
       return;
     }
 
@@ -213,7 +204,7 @@ class Context<TWorldState extends WorldStateBase = WorldStateBase> {
       throw new Error("Can not trim a context when in execution mode");
     }
 
-    if (!this.WorldStateChangeStack) {
+    if (!this.IsInitialized) {
       return;
     }
 
@@ -273,7 +264,9 @@ class Context<TWorldState extends WorldStateBase = WorldStateBase> {
     this.PartialPlanQueue = [];
   }
 
-  private getDefaultStateValue<TStateKey extends keyof TWorldState>(state: TStateKey): TWorldState[TStateKey] {
+  private getDefaultStateValue<TStateKey extends keyof TWorldState & string>(
+    state: TStateKey,
+  ): TWorldState[TStateKey] {
     const currentValue = this.WorldState[state];
 
     if (typeof currentValue === "boolean") {
@@ -285,6 +278,16 @@ class Context<TWorldState extends WorldStateBase = WorldStateBase> {
     }
 
     return currentValue;
+  }
+
+  private getOrCreateWorldStateChangeStack<TStateKey extends keyof TWorldState & string>(
+    stateKey: TStateKey,
+  ): WorldStateChange<TWorldState[TStateKey]>[] {
+    if (!this.WorldStateChangeStack[stateKey]) {
+      this.WorldStateChangeStack[stateKey] = [];
+    }
+
+    return this.WorldStateChangeStack[stateKey] as WorldStateChange<TWorldState[TStateKey]>[];
   }
 }
 

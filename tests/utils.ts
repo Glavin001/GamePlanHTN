@@ -1,4 +1,4 @@
-import Context, { type WorldStateBase } from "../src/context";
+import Context, { type WorldStateBase, type WorldStateChange } from "../src/context";
 import Domain from "../src/domain";
 import CompoundTask from "../src/Tasks/compoundTask";
 import PrimitiveTask from "../src/Tasks/primitiveTask";
@@ -75,9 +75,32 @@ function getSimpleEffect(name, type, state) {
     name,
     type,
     action: (context, innerType) => {
-      context.setState(state, 1, true, innerType);
+      context.setState(state, 1, true, innerType ?? undefined);
     },
   });
+}
+
+function getWorldStateChangeStack<TWorldState extends WorldStateBase, TKey extends keyof TWorldState & string>(
+  context: Context<TWorldState>,
+  key: TKey,
+): WorldStateChange<TWorldState[TKey]>[] {
+  const stack = context.WorldStateChangeStack[key];
+
+  if (!stack) {
+    throw new Error(`Missing world state change stack for ${String(key)}`);
+  }
+
+  return stack as WorldStateChange<TWorldState[TKey]>[];
+}
+
+function shiftOrFail<T>(items: T[]): T {
+  const value = items.shift();
+
+  if (value === undefined) {
+    throw new Error("Expected a value when shifting from array");
+  }
+
+  return value;
 }
 
 export {
@@ -89,6 +112,8 @@ export {
   getSimplePrimitiveTaskWithDoneCondition,
   getEmptySequenceTask,
   getSimpleEffect,
+  getWorldStateChangeStack,
+  shiftOrFail,
 };
 
 export type {

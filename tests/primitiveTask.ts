@@ -5,6 +5,7 @@ import * as assert from "uvu/assert";
 import PrimitiveTask from "../src/Tasks/primitiveTask";
 import Context from "../src/context";
 import Effect from "../src/effect";
+import EffectType from "../src/effectType";
 import TaskStatus from "../src/taskStatus";
 import FuncCondition from "../src/conditions/funcCondition";
 import FuncOperator from "../src/operators/funcOperator";
@@ -82,7 +83,7 @@ test("AddEffect wraps definition and returns task", () => {
   const task = new PrimitiveTask({ name: "Test" });
   const result = task.addEffect({
     name: "Apply",
-    type: null,
+    type: EffectType.PlanOnly,
     action: (context) => {
       context.setState("Done", true, false);
     },
@@ -232,7 +233,7 @@ test("Stop throws for invalid context", () => {
   const task = new PrimitiveTask({ name: "Handlers" });
 
   assert.throws(() => {
-    task.stop(null);
+    task.stop(null as unknown as Context);
   });
 });
 
