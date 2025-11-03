@@ -7,9 +7,13 @@ import type { PlanResult } from "../types";
 import CompoundTask, { type CompoundTaskChild } from "./compoundTask";
 import PrimitiveTask from "./primitiveTask";
 
-interface GoapNode<TContext extends Context<TWorldState>, TWorldState extends WorldStateBase> {
+type ContextWorldState<TContext extends Context<WorldStateBase>> = TContext extends Context<infer TWorldState>
+  ? TWorldState
+  : WorldStateBase;
+
+interface GoapNode<TContext extends Context<WorldStateBase>> {
   cost: number;
-  world: TWorldState;
+  world: ContextWorldState<TContext>;
   plan: PrimitiveTask<TContext>[];
 }
 
@@ -18,12 +22,12 @@ const isGoapChild = <TContext extends Context<WorldStateBase>>(
 ): child is PrimitiveTask<TContext> | CompoundTask<TContext> =>
   child instanceof PrimitiveTask || child instanceof CompoundTask;
 
-const expandChild = <TContext extends Context<TWorldState>, TWorldState extends WorldStateBase>(
+const expandChild = <TContext extends Context<WorldStateBase>>(
   context: TContext,
-  current: GoapNode<TContext, TWorldState>,
+  current: GoapNode<TContext>,
   child: CompoundTaskChild<TContext>,
   childIndex: number,
-): GoapNode<TContext, TWorldState> | null => {
+): GoapNode<TContext> | null => {
   const virtualContext = createVirtualContext(context, current.world);
 
   if (!child.isValid(virtualContext)) {
@@ -74,7 +78,7 @@ const expandChild = <TContext extends Context<TWorldState>, TWorldState extends 
   return null;
 };
 
-const isValid = <TContext extends Context<TWorldState>, TWorldState extends WorldStateBase>(
+const isValid = <TContext extends Context<WorldStateBase>>(
   context: TContext,
   task: CompoundTask<TContext>,
 ): boolean => {
@@ -101,9 +105,10 @@ const serializeWorld = <TWorldState extends WorldStateBase>(world: TWorldState):
   }
 };
 
-const snapshotWorldState = <TContext extends Context<TWorldState>, TWorldState extends WorldStateBase>(
+const snapshotWorldState = <TContext extends Context<WorldStateBase>>(
   context: TContext,
-): TWorldState => {
+): ContextWorldState<TContext> => {
+  type TWorldState = ContextWorldState<TContext>;
   const snapshot = { ...context.WorldState } as TWorldState;
 
   const keys = new Set<string>(Object.keys(context.WorldState as Record<string, unknown>));
@@ -122,13 +127,13 @@ const snapshotWorldState = <TContext extends Context<TWorldState>, TWorldState e
   return snapshot;
 };
 
-const createVirtualContext = <TContext extends Context<TWorldState>, TWorldState extends WorldStateBase>(
+const createVirtualContext = <TContext extends Context<WorldStateBase>>(
   baseContext: TContext,
-  world: TWorldState,
+  world: ContextWorldState<TContext>,
 ): TContext => {
   const virtual = Object.assign(Object.create(Object.getPrototypeOf(baseContext)), baseContext) as TContext;
 
-  virtual.WorldState = { ...world } as TWorldState;
+  virtual.WorldState = { ...world } as ContextWorldState<TContext>;
   virtual.WorldStateChangeStack = {} as typeof baseContext.WorldStateChangeStack;
   const stackKeys = new Set<string>([
     ...Object.keys(world as Record<string, unknown>),
@@ -137,7 +142,7 @@ const createVirtualContext = <TContext extends Context<TWorldState>, TWorldState
   ]);
 
   for (const key of stackKeys) {
-    virtual.WorldStateChangeStack[key as keyof TWorldState & string] = [];
+    virtual.WorldStateChangeStack[key] = [];
   }
 
   virtual.ContextState = ContextState.Planning;
@@ -161,7 +166,7 @@ const createVirtualContext = <TContext extends Context<TWorldState>, TWorldState
   return virtual;
 };
 
-const isGoalSatisfied = <TWorldState extends WorldStateBase>(goal: Record<string, number>, world: TWorldState): boolean => {
+const isGoalSatisfied = (goal: Record<string, number>, world: WorldStateBase): boolean => {
   const worldRecord = world as Record<string, unknown>;
 
   for (const [key, value] of Object.entries(goal)) {
@@ -175,10 +180,10 @@ const isGoalSatisfied = <TWorldState extends WorldStateBase>(goal: Record<string
   return true;
 };
 
-const collectDynamicChildren = <TContext extends Context<TWorldState>, TWorldState extends WorldStateBase>(
+const collectDynamicChildren = <TContext extends Context<WorldStateBase>>(
   task: CompoundTask<TContext>,
   baseContext: TContext,
-  world: TWorldState,
+  world: ContextWorldState<TContext>,
 ): CompoundTaskChild<TContext>[] => {
   const generated: CompoundTaskChild<TContext>[] = [];
 
@@ -240,7 +245,7 @@ const mergeChildren = <TContext extends Context<WorldStateBase>>(
   return merged;
 };
 
-const decompose = <TContext extends Context<TWorldState>, TWorldState extends WorldStateBase>(
+const decompose = <TContext extends Context<WorldStateBase>>(
   context: TContext,
   _startIndex: number,
   task: CompoundTask<TContext>,
@@ -267,7 +272,7 @@ const decompose = <TContext extends Context<TWorldState>, TWorldState extends Wo
     };
   }
 
-  const open: GoapNode<TContext, TWorldState>[] = [
+  const open: GoapNode<TContext>[] = [
     {
       cost: 0,
       world: snapshotWorldState(context),
