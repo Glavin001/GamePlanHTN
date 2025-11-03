@@ -256,6 +256,8 @@ DomainBuilder.begin("Gathering")
 - Costs accumulate across the plan; the planner always returns the lowest-cost valid path while avoiding world-state cycles.
 - If the goal is already satisfied, the sequence succeeds with an empty plan (no-op).
 - Cost/score functions receive the live planning context, so you can compute dynamic values (distance, equipment modifiers, injuries, etc.).
+- Optionally attach a search heuristic with `.goapHeuristic((context, goal) => number)` to enable A*/weighted A* per sequence. The heuristic must be non-negative, finite, and pure.
+- Weighted search is opt-in via `.goapHeuristicWeight(weight)`. Values below `1`, non-finite numbers, or usage without a heuristic fall back to uniform-cost search.
 
 ```ts
 const distance = (from: string, to: string) => Math.abs(/* ... */);
@@ -295,6 +297,74 @@ DomainBuilder.begin("Heist")
     .end()
   .end()
   .end();
+```
+
+When a heuristic is present the GOAP sequence uses A* with `f = g + weight × heuristic`. Heuristics receive the same virtual planning snapshot used for preconditions, so they must not mutate context. Returning `NaN`, `Infinity`, or a negative number automatically falls back to zero (uniform-cost search).
+
+```ts
+const builder = new DomainBuilder("AStar Example");
+
+builder.goapSequence("AchieveC", { HasC: 1 });
+
+builder
+  .goapAction("Get C")
+  .condition("Has B", (ctx) => ctx.hasState("HasB"))
+  .condition("Missing C", (ctx) => !ctx.hasState("HasC"))
+  .do(() => TaskStatus.Success)
+  .effect("Set C", EffectType.PlanOnly, (ctx, type) => ctx.setState("HasC", 1, false, type))
+  .end();
+
+builder
+  .goapAction("Get B")
+  .condition("Missing B", (ctx) => !ctx.hasState("HasB"))
+  .do(() => TaskStatus.Success)
+  .effect("Set B", EffectType.PlanOnly, (ctx, type) => ctx.setState("HasB", 1, false, type))
+  .end();
+
+builder.goapHeuristic((ctx, goal) => {
+  let missing = 0;
+  for (const [key, value] of Object.entries(goal)) {
+    if (ctx.getState(key as never) !== value) {
+      missing += 1;
+    }
+  }
+  return missing; // admissible lower bound for this toy domain
+});
+
+builder.goapHeuristicWeight(1); // pure A*
+
+builder.end();
+```
+
+Increasing the weight above `1` switches to weighted A*, which may find a valid but more expensive plan faster. This can be useful when near-optimal solutions are acceptable:
+
+```ts
+builder.goapSequence("Win", { Goal: 1 });
+
+builder
+  .goapAction("Shortcut", () => 5)
+  .condition("Missing Goal", (ctx) => !ctx.hasState("Goal"))
+  .do(() => TaskStatus.Success)
+  .effect("Goal", EffectType.PlanOnly, (ctx, type) => ctx.setState("Goal", 1, false, type))
+  .end();
+
+builder
+  .goapAction("StepA")
+  .do(() => TaskStatus.Success)
+  .effect("HasA", EffectType.PlanOnly, (ctx, type) => ctx.setState("HasA", 1, false, type))
+  .end();
+
+builder
+  .goapAction("StepB")
+  .condition("HasA", (ctx) => ctx.hasState("HasA"))
+  .do(() => TaskStatus.Success)
+  .effect("Goal", EffectType.PlanOnly, (ctx, type) => ctx.setState("Goal", 1, false, type))
+  .end();
+
+builder.goapHeuristic(() => 0.5); // optimistic estimate
+builder.goapHeuristicWeight(1.5); // may bias toward Shortcut faster
+
+builder.end();
 ```
 
 Both features remain opt-in—existing domains continue to work unchanged. See `tests/utilitySelector.ts` and `tests/goapSequence.ts` for exhaustive coverage of scoring, tie-breaking, cycle avoidance, deterministic path selection, irrelevant-action pruning, and immediate-goal success scenarios.

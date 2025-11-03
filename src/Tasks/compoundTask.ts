@@ -55,6 +55,10 @@ class CompoundTask<TContext extends Context = Context> {
 
   private goapCost?: (context: TContext) => number;
 
+  private goapHeuristic?: (context: TContext, goal: Record<string, number>) => number;
+
+  private goapHeuristicWeight = 1;
+
   public Goal?: Record<string, number>;
 
   constructor({ name, tasks, type, conditions, goal }: CompoundTaskConfig<TContext>) {
@@ -188,6 +192,30 @@ class CompoundTask<TContext extends Context = Context> {
     }
 
     return 0;
+  }
+
+  setGoapHeuristic(heuristic?: (context: TContext, goal: Record<string, number>) => number): this {
+    this.goapHeuristic = heuristic;
+
+    return this;
+  }
+
+  getGoapHeuristic(): ((context: TContext, goal: Record<string, number>) => number) | undefined {
+    return this.goapHeuristic;
+  }
+
+  setGoapHeuristicWeight(weight: number): this {
+    if (typeof weight !== "number" || !Number.isFinite(weight) || weight < 1) {
+      this.goapHeuristicWeight = 1;
+    } else {
+      this.goapHeuristicWeight = weight;
+    }
+
+    return this;
+  }
+
+  getGoapHeuristicWeight(): number {
+    return this.goapHeuristicWeight;
   }
 }
 
