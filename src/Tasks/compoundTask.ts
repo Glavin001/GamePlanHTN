@@ -1,5 +1,6 @@
 import log from "loglevel";
 import type Context from "../context";
+import type { WorldState } from "../context";
 import DecompositionStatus from "../decompositionStatus";
 import type { PlanResult } from "../types";
 import type { EffectDefinition } from "../effect";
@@ -22,6 +23,12 @@ export type CompoundTaskChild<TContext extends Context = Context> =
   | PausePlanTask
   | Slot;
 
+export type GoalEvaluator<TContext extends Context = Context> = (
+  goal: Record<string, number>,
+  world: WorldState,
+  context: TContext,
+) => boolean;
+
 export interface CompoundTaskConfig<TContext extends Context = Context> {
   name: string;
   tasks?: Array<AllTaskTypes<TContext>>
@@ -30,6 +37,7 @@ export interface CompoundTaskConfig<TContext extends Context = Context> {
   conditions?: TaskCondition<TContext>[];
   effects?: EffectDefinition<TContext>[];
   goal?: Record<string, number>;
+  goalEvaluator?: GoalEvaluator<TContext>;
 }
 
 type ValidityTest<TContext extends Context> = (context: TContext, task: CompoundTask<TContext>) => boolean;
@@ -57,7 +65,9 @@ class CompoundTask<TContext extends Context = Context> {
 
   public Goal?: Record<string, number>;
 
-  constructor({ name, tasks, type, conditions, goal }: CompoundTaskConfig<TContext>) {
+  public GoalEvaluator?: GoalEvaluator<TContext>;
+
+  constructor({ name, tasks, type, conditions, goal, goalEvaluator }: CompoundTaskConfig<TContext>) {
     this.Name = name;
     this.Type = type;
     this.validityTest = this.defaultValidityTest.bind(this);
@@ -85,6 +95,7 @@ class CompoundTask<TContext extends Context = Context> {
       this.validityTest = GoapSequenceTask.isValid as ValidityTest<TContext>;
       this.decomposeHandler = GoapSequenceTask.decompose as DecomposeHandler<TContext>;
       this.Goal = goal ? { ...goal } : undefined;
+      this.GoalEvaluator = goalEvaluator;
     }
     // TODO: This would be a point to allow for extensibility to allow folks to provide
     // their own 'isValid' function
@@ -178,6 +189,16 @@ class CompoundTask<TContext extends Context = Context> {
 
   setGoapCost(cost?: (context: TContext) => number): this {
     this.goapCost = cost;
+
+    return this;
+  }
+
+  setGoalEvaluator(goalEvaluator?: GoalEvaluator<TContext>): this {
+    if (this.Type !== "goap_sequence") {
+      throw new Error("Goal evaluators can only be assigned to GOAP sequence tasks");
+    }
+
+    this.GoalEvaluator = goalEvaluator;
 
     return this;
   }

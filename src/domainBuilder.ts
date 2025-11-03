@@ -2,7 +2,7 @@ import Domain from "./domain";
 import type Context from "./context";
 import type { WorldStateBase } from "./context";
 import { type EffectTypeValue } from "./effectType";
-import CompoundTask, { type CompoundTaskChild } from "./Tasks/compoundTask";
+import CompoundTask, { type CompoundTaskChild, type GoalEvaluator } from "./Tasks/compoundTask";
 import PrimitiveTask, { type PrimitiveTaskOperator, type TaskCondition } from "./Tasks/primitiveTask";
 import PausePlanTask from "./Tasks/pausePlanTask";
 import Slot from "./Tasks/slot";
@@ -60,12 +60,24 @@ class DomainBuilder<TContext extends Context<WorldStateBase> = Context> {
     return this.addCompoundTask(new CompoundTask<TContext>({ name, type: "utility_select" }));
   }
 
-  goapSequence(name: string, goal: Record<string, number>): this {
-    return this.addCompoundTask(new CompoundTask<TContext>({ name, type: "goap_sequence", goal }));
+  goapSequence(name: string, goal: Record<string, number>, goalEvaluator?: GoalEvaluator<TContext>): this {
+    return this.addCompoundTask(new CompoundTask<TContext>({ name, type: "goap_sequence", goal, goalEvaluator }));
   }
 
   compoundTask(task: CompoundTask<TContext>): this {
     return this.addCompoundTask(task);
+  }
+
+  goalEvaluator(goalEvaluator?: GoalEvaluator<TContext>): this {
+    const pointer = this.ensureCompoundPointer();
+
+    if (pointer.Type !== "goap_sequence") {
+      throw new Error("Goal evaluators can only be assigned to GOAP sequence tasks");
+    }
+
+    pointer.setGoalEvaluator(goalEvaluator);
+
+    return this;
   }
 
   primitiveTask(task: PrimitiveTask<TContext>): this {
