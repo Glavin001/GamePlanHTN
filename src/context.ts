@@ -8,6 +8,10 @@ export interface WorldStateChange<TValue> {
 }
 
 export type WorldStateBase = Record<string, unknown>;
+
+/**
+ * @deprecated Use WorldStateBase instead
+ */
 export type WorldState = Record<string, number>;
 
 export type WorldStateChangeStack<_TWorldState extends WorldStateBase> = Record<string, WorldStateChange<unknown>[]>;
